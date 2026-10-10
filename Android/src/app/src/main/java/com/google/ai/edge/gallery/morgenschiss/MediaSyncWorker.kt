@@ -72,8 +72,14 @@ class MediaSyncWorker(context: Context, params: WorkerParameters) : CoroutineWor
   private val notifications = context.getSystemService(NotificationManager::class.java)
 
   override suspend fun doWork(): Result {
-    // the periodic and the manual job share one lock: two parallel runs only fight over index_busy
-    if (!running.tryLock()) return Result.success()
+    // the periodic and the manual job share one lock: two parallel runs only fight over index_busy.
+    // A manual run waits for a background run instead of reporting "done" while nothing happened.
+    if (!running.tryLock()) {
+      if (tags.contains(UNIQUE_NOW)) {
+        report("Abgleich läuft schon im Hintergrund, wartet", 0, 0)
+        running.lock()
+      } else return Result.success()
+    }
     try {
       return sync()
     } finally {
@@ -361,7 +367,7 @@ class MediaSyncWorker(context: Context, params: WorkerParameters) : CoroutineWor
     const val KEY_ERROR = "error"
     const val KEY_UPLOADED = "uploaded"
     const val UNIQUE_NOW = "media_sync_now"
-    private const val UNIQUE_PERIODIC = "media_sync_periodic"
+    const val UNIQUE_PERIODIC = "media_sync_periodic"
 
     // the first sync sends several GB of previews: Wi-Fi (unmetered) only, never mobile data
     private val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.UNMETERED).build()
@@ -372,6 +378,7 @@ class MediaSyncWorker(context: Context, params: WorkerParameters) : CoroutineWor
           UNIQUE_NOW,
           ExistingWorkPolicy.KEEP,
           OneTimeWorkRequestBuilder<MediaSyncWorker>()
+            .addTag(UNIQUE_NOW)
             .setConstraints(constraints)
             .setBackoffCriteria(androidx.work.BackoffPolicy.EXPONENTIAL, 1, TimeUnit.MINUTES)
             .build(),

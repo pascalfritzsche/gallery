@@ -149,7 +149,10 @@ private fun SyncStatus(onSync: () -> Unit) {
   val context = LocalContext.current
   val infos by
     WorkManager.getInstance(context).getWorkInfosForUniqueWorkFlow(MediaSyncWorker.UNIQUE_NOW).collectAsState(initial = emptyList())
-  val info = infos.firstOrNull()
+  val background by
+    WorkManager.getInstance(context).getWorkInfosForUniqueWorkFlow(MediaSyncWorker.UNIQUE_PERIODIC).collectAsState(initial = emptyList())
+  // the automatic run every few hours shows its progress here too
+  val info = background.firstOrNull { it.state == WorkInfo.State.RUNNING } ?: infos.firstOrNull()
   val running = info?.state == WorkInfo.State.RUNNING
   val progress = info?.progress
   Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
