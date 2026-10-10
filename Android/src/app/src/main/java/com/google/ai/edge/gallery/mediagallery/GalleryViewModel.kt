@@ -30,6 +30,8 @@ import com.google.ai.edge.gallery.morgenschiss.MediaSearchApi
 import com.google.ai.edge.gallery.morgenschiss.MediaSyncWorker
 import com.google.ai.edge.gallery.morgenschiss.Scope
 import com.google.ai.edge.gallery.morgenschiss.Session
+import com.google.ai.edge.gallery.morgenschiss.VectorStore
+import com.google.ai.edge.gallery.morgenschiss.VectorSync
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -61,6 +63,8 @@ data class SearchState(
   val spoken: List<Spoken> = emptyList(),
 )
 
+private const val PARTIAL = "Auf dem Handy gesucht, dort fehlen noch Suchdaten (sie kommen beim Abgleich im WLAN)."
+
 data class Spoken(val item: MediaItem, val t: Double, val text: String)
 
 @HiltViewModel
@@ -73,6 +77,7 @@ constructor(
   private val idStore: MediaIdStore,
   val localSearch: LocalSearch,
   private val albumRepo: AlbumRepository,
+  private val vectorStore: VectorStore,
 ) : ViewModel() {
   val pendingMoves: StateFlow<Map<Long, PendingMove>> = albumRepo.pendingMoves
 
@@ -144,7 +149,7 @@ constructor(
   fun onPermissionGranted() {
     repository.start()
     refreshAlbums()
-    localSearch.scheduleIndexing()
+    localSearch.cancelOldIndexing()
     if (api.client.isLoggedIn) {
       MediaSyncWorker.schedulePeriodic(context)
       MediaSyncWorker.runNow(context)
@@ -167,6 +172,8 @@ constructor(
   fun logout() {
     MediaSyncWorker.cancelAll(context)
     api.client.logout()
+    // another account must not search in these vectors
+    viewModelScope.launch(Dispatchers.IO) { VectorSync.reset(context, vectorStore) }
   }
 
   fun syncNow() = MediaSyncWorker.runNow(context)
@@ -210,11 +217,35 @@ constructor(
         val everywhere = _search.value.everywhere || bucketId == null
         val scopeItems = library.value.itemsIn(if (everywhere) null else bucketId)
         val folder = if (everywhere) null else scopeItems.firstOrNull()?.folder
-        val r = api.search(query.trim(), Scope(folder = folder), onlyBubbles = _search.value.onlyBubbles)
+        val q = query.trim()
+        // the bubble filter still lives on the server (moves to the phone with the bubbles)
+        val local = if (_search.value.onlyBubbles) null else localSearch.search(q, scopeItems)
+        // while most files still lack a vector on the phone (first sync), morgenschiss knows more
+        if (local != null && (local.complete || !api.client.isLoggedIn)) {
+          _search.value =
+            _search.value.copy(
+              loading = false,
+              results = local.items,
+              times = local.times,
+              spoken = emptyList(),
+              source = SearchSource.LOCAL,
+              message = if (local.items.isEmpty()) "Nichts gefunden." else null,
+            )
+          // what was said in videos is still searched by morgenschiss; it joins when it arrives
+          if (api.client.isLoggedIn) {
+            val r = api.search(q, Scope(folder = folder), limit = 1)
+            if (r is ApiResult.Ok && r.value.spoken.isNotEmpty()) {
+              val spoken = spokenOf(r.value.spoken, scopeItems)
+              _search.value = _search.value.copy(spoken = spoken, message = if (local.items.isEmpty() && spoken.isEmpty()) "Nichts gefunden." else null)
+            }
+          }
+          return@launch
+        }
+        val r = api.search(q, Scope(folder = folder), onlyBubbles = _search.value.onlyBubbles)
         _search.value =
           when (r) {
             is ApiResult.Ok -> serverResults(r.value.results, scopeItems, r.value.spoken)
-            else -> localResults(query.trim(), scopeItems, r)
+            else -> localResults(q, scopeItems, r, local)
           }
       }
   }
@@ -225,20 +256,16 @@ constructor(
     searchJob =
       viewModelScope.launch {
         _search.value = SearchState(query = "Ähnlich wie ${item.name}", everywhere = true, loading = true)
-        val fp = withContext(Dispatchers.IO) { idStore.all()[item.id]?.fingerprint }
-        val r = if (fp != null) api.similar(fp, Scope()) else null
+        val local = localSearch.similar(item, library.value.items)
         _search.value =
-          if (r is ApiResult.Ok) {
-            serverResults(r.value.results, library.value.items).copy(query = _search.value.query)
+          if (local != null && (local.complete || !api.client.isLoggedIn)) {
+            _search.value.copy(loading = false, results = local.items, times = local.times, source = SearchSource.LOCAL, message = null)
           } else {
-            val local = localSearch.similar(item, library.value.items)
-            _search.value.copy(
-              loading = false,
-              results = local ?: emptyList(),
-              times = emptyMap(),
-              source = SearchSource.LOCAL,
-              message = if (local == null) "Ähnliche Bilder gehen gerade nicht: morgenschiss nicht erreichbar und kein lokaler Index." else "Lokal gesucht.",
-            )
+            val fp = withContext(Dispatchers.IO) { idStore.all()[item.id]?.fingerprint }
+            val r = if (fp != null) api.similar(fp, Scope()) else null
+            if (r is ApiResult.Ok) serverResults(r.value.results, library.value.items).copy(query = _search.value.query)
+            else if (local != null) _search.value.copy(loading = false, results = local.items, times = local.times, source = SearchSource.LOCAL, message = PARTIAL)
+            else _search.value.copy(loading = false, results = emptyList(), times = emptyMap(), source = SearchSource.LOCAL, message = noLocalReason())
           }
       }
   }
@@ -255,7 +282,7 @@ constructor(
           byFp[h.id].orEmpty().mapNotNull { inScope[it] }.onEach { item -> if (h.t != null && item.isVideo) times[item.id] = h.t }
         }
         .distinctBy { it.id }
-    val spoken = spokenHits.mapNotNull { h -> byFp[h.id]?.firstNotNullOfOrNull { inScope[it] }?.let { Spoken(it, h.t, h.text) } }
+    val spoken = spokenOf(spokenHits, scopeItems)
     return _search.value.copy(
       loading = false,
       results = items,
@@ -266,10 +293,28 @@ constructor(
     )
   }
 
-  private suspend fun localResults(query: String, scopeItems: List<MediaItem>, r: ApiResult<*>): SearchState {
-    val local = localSearch.search(query, scopeItems)
-    if (local != null) {
-      return _search.value.copy(loading = false, results = local, times = emptyMap(), spoken = emptyList(), source = SearchSource.LOCAL, message = "Lokal gesucht (${reason(r)}).")
+  private suspend fun spokenOf(hits: List<SpokenHit>, scopeItems: List<MediaItem>): List<Spoken> {
+    val byFp = withContext(Dispatchers.IO) { idStore.all().values.groupBy({ it.fingerprint }, { it.mediaId }) }
+    val inScope = scopeItems.associateBy { it.id }
+    return hits.mapNotNull { h -> byFp[h.id]?.firstNotNullOfOrNull { inScope[it] }?.let { Spoken(it, h.t, h.text) } }
+  }
+
+  private suspend fun noLocalReason(): String =
+    when {
+      !localSearch.isModelReady() -> "Das Suchmodell fehlt noch auf dem Handy (Einstellungen)."
+      localSearch.vectorCount() == 0 -> "Noch keine Suchdaten auf dem Handy, sie kommen mit dem nächsten Abgleich im WLAN."
+      else -> "Suche auf dem Handy fehlgeschlagen."
+    }
+
+  private suspend fun localResults(query: String, scopeItems: List<MediaItem>, r: ApiResult<*>, partial: LocalHits?): SearchState {
+    if (partial != null) {
+      return _search.value.copy(loading = false, results = partial.items, times = partial.times, spoken = emptyList(), source = SearchSource.LOCAL, message = PARTIAL)
+    }
+    // with the bubble filter the server was asked first; without it the phone already failed
+    if (_search.value.onlyBubbles) {
+      localSearch.search(query, scopeItems)?.let {
+        return _search.value.copy(loading = false, results = it.items, times = it.times, spoken = emptyList(), source = SearchSource.LOCAL, message = "Ohne Bubble-Filter gesucht (${reason(r)}).")
+      }
     }
     val byName = scopeItems.filter { it.name.contains(query, ignoreCase = true) }
     return _search.value.copy(
@@ -278,7 +323,7 @@ constructor(
       times = emptyMap(),
       spoken = emptyList(),
       source = SearchSource.NAME_ONLY,
-      message = "Nur Dateinamen durchsucht (${reason(r)}, kein lokaler Index).",
+      message = "Nur Dateinamen durchsucht. ${noLocalReason()}",
     )
   }
 
