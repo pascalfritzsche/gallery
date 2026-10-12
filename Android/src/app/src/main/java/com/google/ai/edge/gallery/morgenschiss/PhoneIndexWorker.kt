@@ -69,7 +69,7 @@ interface PhoneIndexEntryPoint {
 }
 
 /**
- * The phone indexes its own media while charging: newest first (the Mac sync takes the oldest),
+ * The phone indexes its own media in the background: newest first (the Mac sync takes the oldest),
  * photos, videos and their scenes. Vectors go into [VectorStore] right away, so they are
  * searchable offline, and to morgenschiss when it is reachable (bubbles and albums live there).
  */
@@ -315,13 +315,17 @@ class PhoneIndexWorker(context: Context, params: WorkerParameters) : CoroutineWo
     const val KEY_PHASE = "phase"
     const val KEY_DONE = "done"
     const val KEY_TOTAL = "total"
-    const val UNIQUE_NOW = "phone_index_now"
+    // new name: a queued run from before still waited for charging and would block this one
+    const val UNIQUE_NOW = "phone_index_now_v2"
+    private const val OLD_UNIQUE_NOW = "phone_index_now"
     const val UNIQUE_PERIODIC = "phone_index_periodic"
 
-    // indexing runs the GPU for a long time: only while charging
-    private val constraints = Constraints.Builder().setRequiresCharging(true).setRequiresBatteryNotLow(true).build()
+    // not tied to charging: over a weak USB port Android kept reporting "not charging" and never
+    // ran it. A low battery and a hot phone (see tooHot) still stop it.
+    private val constraints = Constraints.Builder().setRequiresBatteryNotLow(true).build()
 
     fun runNow(context: Context) {
+      WorkManager.getInstance(context).cancelUniqueWork(OLD_UNIQUE_NOW)
       WorkManager.getInstance(context)
         .enqueueUniqueWork(UNIQUE_NOW, ExistingWorkPolicy.KEEP, OneTimeWorkRequestBuilder<PhoneIndexWorker>().setConstraints(constraints).build())
     }
@@ -335,7 +339,8 @@ class PhoneIndexWorker(context: Context, params: WorkerParameters) : CoroutineWo
       WorkManager.getInstance(context)
         .enqueueUniquePeriodicWork(
           UNIQUE_PERIODIC,
-          ExistingPeriodicWorkPolicy.KEEP,
+          // UPDATE carries the new constraints over to an already scheduled run
+          ExistingPeriodicWorkPolicy.UPDATE,
           PeriodicWorkRequestBuilder<PhoneIndexWorker>(6, TimeUnit.HOURS).setConstraints(constraints).build(),
         )
     }
