@@ -50,7 +50,7 @@ object VectorSync {
         invalidate = false,
         rows = page.items.mapNotNull { v ->
           val q = runCatching { VectorStore.decode(v.q) }.getOrNull()?.takeIf { it.size == DIMS } ?: return@mapNotNull null
-          VectorStore.Row(v.key, v.id, if (v.kind == "scene") v.t else null, v.kind, "server", v.tokens, q, v.s)
+          VectorStore.Row(v.key, v.id, if (v.kind == "scene") v.t else null, v.kind, VectorStore.SOURCE_SERVER, v.tokens, q, v.s)
         }
       )
       after = page.next ?: break

@@ -92,6 +92,11 @@ class MediaIdStore @Inject constructor(@ApplicationContext context: Context) :
       readableDatabase.rawQuery("SELECT fp FROM ids WHERE media_id = ?", arrayOf(mediaId.toString())).use {
         if (it.moveToFirst()) it.getString(0) else null
       }
+    // the other worker may have fingerprinted and indexed it meanwhile: same content keeps its state
+    if (previous == fingerprint) {
+      writableDatabase.update("ids", ContentValues().apply { put("size", size); put("date_modified", dateModifiedSec) }, "media_id = ?", arrayOf(mediaId.toString()))
+      return null
+    }
     writableDatabase.insertWithOnConflict(
       "ids",
       null,

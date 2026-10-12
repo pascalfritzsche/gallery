@@ -154,14 +154,18 @@ class MediaSyncWorker(context: Context, params: WorkerParameters) : CoroutineWor
     }
 
     // 3. upload, one batch at a time (a parallel batch would get 429 index_busy)
-    val batches = SyncPlanner.batches(plan.upload)
+    // oldest first: the phone indexes from the newest end, so the two meet in the middle
+    val batches = SyncPlanner.batches(plan.upload.sortedBy { byId.getValue(it.mediaId).takenAt })
     var done = 0
     for (batch in batches) {
       if (isStopped) return Result.retry()
       report("Hochladen", done, plan.upload.size)
+      val phoneDone = vectors.pendingFingerprints()
       val sent = batch.mapNotNull { f ->
         val item = byId.getValue(f.mediaId)
         val fp = rows[f.mediaId]?.fingerprint ?: return@mapNotNull null
+        // the phone computed it already and sends it itself
+        if (fp in phoneDone) return@mapNotNull null
         val frames = runCatching { FrameEncoder.framesFor(applicationContext.contentResolver, item) }.getOrElse { emptyList() }
         if (frames.isEmpty()) {
           store.markFailed(listOf(f.mediaId))
@@ -179,7 +183,10 @@ class MediaSyncWorker(context: Context, params: WorkerParameters) : CoroutineWor
     runCatching { sortIntoFolderAlbums(api, byId) }
 
     // 4. scenes along videos, so a moment inside a long video can be found
-    val sceneVideos = SyncPlanner.needScenes(files, store.all())
+    // a video the phone is about to send comes with its own scenes
+    val phonePending = vectors.pendingFingerprints()
+    val sceneRows = store.all()
+    val sceneVideos = SyncPlanner.needScenes(files, sceneRows).filter { sceneRows[it.mediaId]?.fingerprint !in phonePending }
     sceneVideos.forEachIndexed { i, f ->
       if (isStopped) return Result.retry()
       report("Szenen aus Videos", i, sceneVideos.size)

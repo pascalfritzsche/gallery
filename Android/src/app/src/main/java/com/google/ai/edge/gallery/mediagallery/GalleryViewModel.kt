@@ -28,6 +28,7 @@ import com.google.ai.edge.gallery.morgenschiss.SpokenHit
 import com.google.ai.edge.gallery.morgenschiss.MediaIdStore
 import com.google.ai.edge.gallery.morgenschiss.MediaSearchApi
 import com.google.ai.edge.gallery.morgenschiss.MediaSyncWorker
+import com.google.ai.edge.gallery.morgenschiss.PhoneIndexWorker
 import com.google.ai.edge.gallery.morgenschiss.Scope
 import com.google.ai.edge.gallery.morgenschiss.Session
 import com.google.ai.edge.gallery.morgenschiss.VectorStore
@@ -150,6 +151,8 @@ constructor(
     repository.start()
     refreshAlbums()
     localSearch.cancelOldIndexing()
+    PhoneIndexWorker.schedulePeriodic(context)
+    PhoneIndexWorker.runNow(context)
     if (api.client.isLoggedIn) {
       MediaSyncWorker.schedulePeriodic(context)
       MediaSyncWorker.runNow(context)
@@ -171,6 +174,7 @@ constructor(
 
   fun logout() {
     MediaSyncWorker.cancelAll(context)
+    PhoneIndexWorker.cancelAll(context)
     api.client.logout()
     // another account must not search in these vectors
     viewModelScope.launch(Dispatchers.IO) { VectorSync.reset(context, vectorStore) }

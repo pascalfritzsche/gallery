@@ -19,7 +19,7 @@ Erstindexierung bzw. wenn viel zu tun ist (parallel). Transkripte nicht für all
 - [x] 1.4 Suche, Ähnliche, Szenen-Treffer lokal; Server nicht mehr für die Suche
 
 ### Phase 2: Bubbles, Alben, Aufräumen, Kategorien lokal
-### Phase 3: Handy rechnet neue Medien selbst (280 Tokens), Mac parallel nur bei großem Rückstand
+### Phase 3: Handy rechnet selbst (140 Tokens), Mac parallel von der anderen Seite (vorgezogen, 2026-10-12)
 ### Phase 4: "Tiefer suchen" in Videos auf dem Handy (2-s-Fenster Bild+Ton)
 ### Phase 5: Transkripte auf Abruf mit Gemma 4 E2B auf dem Handy
 
@@ -33,4 +33,7 @@ Erstindexierung bzw. wenn viel zu tun ist (parallel). Transkripte nicht für all
 - **Phase 1**: Review-Fixes: zurueckgekehrte Dateien (SD-Karte, Papierkorb) holen ihre Vektoren per Voll-Download zurueck; Index-Neubau unter derselben Sperre wie Schreiben; Teil-Abdeckung (<90 %) fragt zuerst morgenschiss; ersetzte Szenen werden lokal geloescht; Abmelden leert die Suchdaten.
 - **Phase 1 / fuer Phase 3**: Das Modell meldet beim Laden ein Bildbudget von hoechstens 140 Tokens ("capping to 140"); die 280 im Bench waren also ebenfalls 140. Fuer die Indexierung auf dem Handy pruefen.
 - **Phase 1**: Am S26 geprueft: Modell-Download aus dem Hinweis, Suche "hund" auf dem Handy findet Dackel/Hund-Bilder aus den heruntergeladenen Mac-Vektoren.
+- **Phase 3** (vorgezogen): Server nimmt Handy-Vektoren an (KuhlerBuhler/Interface#817, `/vectors/put`, ohne Mac). `PhoneIndexWorker` rechnet beim Laden die neuesten Dateien (Fotos 1024 px, Videos 2 Frames + Szenen), legt sie sofort in `vectors.db` und schickt sie, sobald angemeldet und erreichbar; erst dann gilt die Datei als indexiert. Der Mac-Abgleich nimmt die aeltesten und ueberspringt, was das Handy schon hat.
+- **Phase 3**: Gemessen am S26 (parallel zum Mac-Upload der Release-App): ~0,75 s je Inferenz, ~80/min. Am USB des Macs reicht der Strom nicht, der Akku faellt, Android meldet "laedt nicht" und stoppt den Lauf; am Netzteil sollte das nicht passieren (nicht geprueft). Temperatur stieg in 3 Minuten von 30 auf 38 Grad.
+- **Phase 3**: Ein Video mit Szenen ist eine eigene Runde, danach wird gesendet; sonst ging bei einem Stopp eine ganze Runde verloren.
 
