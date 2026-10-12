@@ -27,6 +27,7 @@ import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -147,10 +148,7 @@ fun MediaViewerScreen(
           IconButton(onClick = onBack) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück", tint = Color.White)
           }
-          Column(Modifier.weight(1f)) {
-            Text(current.name, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
-            Text(dateFormat.format(Date(current.takenAt)), color = Color.White.copy(alpha = 0.75f), style = MaterialTheme.typography.bodySmall)
-          }
+          Spacer(Modifier.weight(1f))
           actions(current)
           if (current.isVideo && transcript.available) {
             IconButton(onClick = { showTranscript = !showTranscript }) {
@@ -176,6 +174,11 @@ fun MediaViewerScreen(
               DropdownMenuItem(text = { Text("Details") }, onClick = { menu = false; showInfo = true })
             }
           }
+        }
+        // own line: the icon row is longer for videos and would squeeze the name
+        Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)) {
+          Text(current.name, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
+          Text(dateFormat.format(Date(current.takenAt)), color = Color.White.copy(alpha = 0.75f), maxLines = 1, style = MaterialTheme.typography.bodySmall)
         }
       }
     }
