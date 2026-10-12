@@ -38,7 +38,7 @@ data class VectorHit(val fingerprint: String, val t: Double?, val score: Float)
  */
 @Singleton
 class VectorStore @Inject constructor(@ApplicationContext context: Context) :
-  SQLiteOpenHelper(context, "vectors.db", null, 1) {
+  SQLiteOpenHelper(context, "vectors.db", null, 2) {
 
   override fun onCreate(db: SQLiteDatabase) {
     db.execSQL(
@@ -46,9 +46,38 @@ class VectorStore @Inject constructor(@ApplicationContext context: Context) :
         "source TEXT NOT NULL, tokens INTEGER NOT NULL, q BLOB NOT NULL, s REAL NOT NULL)"
     )
     db.execSQL("CREATE INDEX vec_fp ON vec(fp)")
+    onUpgrade(db, 1, 2)
   }
 
-  override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {}
+  override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+    // files the phone could not embed; the Mac path still tries them
+    if (oldVersion < 2) db.execSQL("CREATE TABLE IF NOT EXISTS phone_failed (fp TEXT PRIMARY KEY)")
+  }
+
+  fun phoneFailed(): Set<String> {
+    val out = HashSet<String>()
+    readableDatabase.rawQuery("SELECT fp FROM phone_failed", null).use { c -> while (c.moveToNext()) out += c.getString(0) }
+    return out
+  }
+
+  fun markPhoneFailed(fps: Collection<String>) {
+    if (fps.isEmpty()) return
+    val db = writableDatabase
+    db.beginTransaction()
+    try {
+      for (fp in fps) db.insertWithOnConflict("phone_failed", null, ContentValues().apply { put("fp", fp) }, SQLiteDatabase.CONFLICT_IGNORE)
+      db.setTransactionSuccessful()
+    } finally {
+      db.endTransaction()
+    }
+  }
+
+  /** Fingerprints with vectors the phone computed and has not sent yet; the Mac path skips them. */
+  fun pendingFingerprints(): Set<String> {
+    val out = HashSet<String>()
+    readableDatabase.rawQuery("SELECT DISTINCT fp FROM vec WHERE source = ?", arrayOf(SOURCE_PHONE)).use { c -> while (c.moveToNext()) out += c.getString(0) }
+    return out
+  }
 
   /** In memory: one contiguous int8 block plus a factor per row (scale and length folded). */
   private class Index(val fps: Array<String>, val ts: DoubleArray, val q: ByteArray, val k: FloatArray) {
@@ -103,7 +132,8 @@ class VectorStore @Inject constructor(@ApplicationContext context: Context) :
   @Synchronized
   fun dropScenesExcept(fingerprint: String, keep: Set<String>) {
     val gone = ArrayList<String>()
-    readableDatabase.rawQuery("SELECT key FROM vec WHERE fp = ? AND kind = 'scene'", arrayOf(fingerprint)).use { c ->
+    // scenes the phone computed and not sent yet are not the server's to replace
+    readableDatabase.rawQuery("SELECT key FROM vec WHERE fp = ? AND kind = 'scene' AND source != ?", arrayOf(fingerprint, SOURCE_PHONE)).use { c ->
       while (c.moveToNext()) if (c.getString(0) !in keep) gone += c.getString(0)
     }
     if (gone.isEmpty()) return
@@ -130,11 +160,11 @@ class VectorStore @Inject constructor(@ApplicationContext context: Context) :
   }
 
   @Synchronized
-  fun markSent(keys: Collection<String>) {
+  fun markSent(keys: Collection<String>, source: String = SOURCE_PHONE_SENT) {
     val db = writableDatabase
     db.beginTransaction()
     try {
-      for (k in keys) db.update("vec", ContentValues().apply { put("source", SOURCE_PHONE_SENT) }, "key = ?", arrayOf(k))
+      for (k in keys) db.update("vec", ContentValues().apply { put("source", source) }, "key = ?", arrayOf(k))
       db.setTransactionSuccessful()
     } finally {
       db.endTransaction()
@@ -239,6 +269,8 @@ class VectorStore @Inject constructor(@ApplicationContext context: Context) :
     /** Computed on the phone, not yet on morgenschiss. */
     const val SOURCE_PHONE = "phone"
     const val SOURCE_PHONE_SENT = "phone-sent"
+    /** The server rejected it; kept for the local search, the Mac path sends the file itself. */
+    const val SOURCE_PHONE_REJECTED = "phone-rejected"
 
     fun encode(q: ByteArray): String = Base64.encodeToString(q, Base64.NO_WRAP)
 

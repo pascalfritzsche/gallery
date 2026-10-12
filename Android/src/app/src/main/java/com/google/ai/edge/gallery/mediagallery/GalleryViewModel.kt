@@ -174,6 +174,7 @@ constructor(
 
   fun logout() {
     MediaSyncWorker.cancelAll(context)
+    PhoneIndexWorker.cancelAll(context)
     api.client.logout()
     // another account must not search in these vectors
     viewModelScope.launch(Dispatchers.IO) { VectorSync.reset(context, vectorStore) }

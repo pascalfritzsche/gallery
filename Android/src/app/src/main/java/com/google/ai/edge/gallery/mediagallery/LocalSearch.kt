@@ -50,6 +50,16 @@ const val QUERY_PREFIX = "task: search result | query: "
 /** The model caps the image budget on the phone at 140 tokens (it logs "capping to 140"). */
 const val PHONE_VISION_TOKENS = 140
 
+sealed interface Embedded {
+  data class Ok(val vector: FloatArray) : Embedded
+
+  /** This file: nothing decodable or the model refused it. */
+  data object BadInput : Embedded
+
+  /** No model or it does not start: nothing can be embedded right now. */
+  data object Unavailable : Embedded
+}
+
 /** [complete] = at least 90 % of the files in scope have a vector on the phone. */
 data class LocalHits(val items: List<MediaItem>, val times: Map<Long, Double>, val complete: Boolean)
 
@@ -147,19 +157,23 @@ constructor(
     return rank(v, scope, seed = fp)
   }
 
-  /** One vector from one or more frames (a video's first and last frame); null = no model or failed. */
-  suspend fun embedFrames(frames: List<android.graphics.Bitmap>): FloatArray? {
-    if (frames.isEmpty()) return null
-    val e = embedder() ?: return null
+  /** One vector from one or more frames (a video's first and last frame). */
+  suspend fun embedFrames(frames: List<android.graphics.Bitmap>): Embedded {
+    if (frames.isEmpty()) return Embedded.BadInput
+    val e = embedder() ?: return Embedded.Unavailable
     val tgas = frames.map { ImageUtils.encodeTga(it) }
-    return runCatching {
+    return try {
+      val v =
         inference.withLock {
           withContext(Dispatchers.Default) { if (tgas.size == 1) e.generateImageEmbedding(tgas[0]) else e.generateImagesEmbedding(tgas) }
         }
-      }
-      .onFailure { Log.w(TAG, "embedding failed", it) }
-      .getOrNull()
-      ?.takeIf { it.size == DIMS }
+      if (v != null && v.size == DIMS) Embedded.Ok(v) else Embedded.BadInput
+    } catch (c: kotlinx.coroutines.CancellationException) {
+      throw c
+    } catch (t: Throwable) {
+      Log.w(TAG, "embedding failed", t)
+      Embedded.BadInput
+    }
   }
 
   private suspend fun rank(v: FloatArray, scope: List<MediaItem>, seed: String?): LocalHits {

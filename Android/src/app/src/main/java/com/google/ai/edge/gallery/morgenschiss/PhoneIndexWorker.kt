@@ -23,6 +23,7 @@ import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.ImageDecoder
+import android.os.PowerManager
 import android.util.Base64
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -36,6 +37,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import com.google.ai.edge.gallery.mediagallery.Embedded
 import com.google.ai.edge.gallery.mediagallery.LocalSearch
 import com.google.ai.edge.gallery.mediagallery.MediaItem
 import com.google.ai.edge.gallery.mediagallery.MediaRepository
@@ -109,26 +111,40 @@ class PhoneIndexWorker(context: Context, params: WorkerParameters) : CoroutineWo
     sendPending(api, store, vectors, byId)
 
     var done = 0
-    val total = nextBatch(store.all(), vectors.fingerprints(), byId, Int.MAX_VALUE).size
+    val total = nextBatch(store.all(), vectors.fingerprints() + vectors.phoneFailed(), byId, Int.MAX_VALUE).size
     while (!isStopped) {
+      if (tooHot()) {
+        Log.i(TAG, "phone too warm, pausing")
+        return Result.retry()
+      }
       // read again every round: the Mac sync works on the same list from the other end
-      val have = vectors.fingerprints()
+      val have = vectors.fingerprints() + vectors.phoneFailed()
       // a video with its scenes takes minutes: it makes a round of its own, so a stop loses little
       val next = nextBatch(store.all(), have, byId, 16)
       if (next.isEmpty()) break
       val todo = next.let { b -> if (b.first().second.isVideo) b.take(1) else b.takeWhile { !it.second.isVideo } }
       report("Auf dem Handy indexieren", done, maxOf(total, done + todo.size))
       val rows = ArrayList<VectorStore.Row>()
-      val broken = ArrayList<Long>()
+      val broken = ArrayList<String>()
+      var unavailable = false
       for ((row, item) in todo) {
         if (isStopped) break
-        val r = embedItem(search, row.fingerprint, item)
-        if (r.isEmpty()) broken += row.mediaId else rows += r
+        when (val r = embedItem(search, row.fingerprint, item)) {
+          is ItemResult.Done -> rows += r.rows
+          ItemResult.Bad -> broken += row.fingerprint
+          // a stopped video keeps nothing, so it starts over with all its scenes next time
+          ItemResult.Stopped -> {}
+          ItemResult.Unavailable -> unavailable = true
+        }
+        if (unavailable) break
       }
-      if (rows.isEmpty() && !search.isModelReady()) break
-      // unreadable files are skipped from now on, like the server's failed ones
-      store.markFailed(broken)
       vectors.put(rows)
+      // the phone skips them from now on; the Mac path, which decodes differently, still tries
+      vectors.markPhoneFailed(broken)
+      if (unavailable) {
+        Log.w(TAG, "search model does not start, trying again later")
+        return Result.retry()
+      }
       done += todo.size
       sendPending(api, store, vectors, byId)
     }
@@ -149,7 +165,21 @@ class PhoneIndexWorker(context: Context, params: WorkerParameters) : CoroutineWo
       .toList()
   }
 
-  private suspend fun embedItem(search: LocalSearch, fp: String, item: MediaItem): List<VectorStore.Row> {
+  private sealed interface ItemResult {
+    data class Done(val rows: List<VectorStore.Row>) : ItemResult
+
+    data object Bad : ItemResult
+
+    data object Stopped : ItemResult
+
+    data object Unavailable : ItemResult
+  }
+
+  /** Thermal status from Android; "moderate" means the phone already throttles. */
+  private fun tooHot(): Boolean =
+    applicationContext.getSystemService(PowerManager::class.java).currentThermalStatus >= PowerManager.THERMAL_STATUS_MODERATE
+
+  private suspend fun embedItem(search: LocalSearch, fp: String, item: MediaItem): ItemResult {
     val resolver = applicationContext.contentResolver
     val frames =
       runCatching {
@@ -163,7 +193,12 @@ class PhoneIndexWorker(context: Context, params: WorkerParameters) : CoroutineWo
           )
         }
         .getOrElse { emptyList() }
-    val v = try { search.embedFrames(frames) } finally { frames.forEach { it.recycle() } } ?: return emptyList()
+    val v =
+      when (val r = try { search.embedFrames(frames) } finally { frames.forEach { it.recycle() } }) {
+        is Embedded.Ok -> r.vector
+        Embedded.BadInput -> return ItemResult.Bad
+        Embedded.Unavailable -> return ItemResult.Unavailable
+      }
     val (q, s) = VectorStore.pack(v)
     val out = arrayListOf(VectorStore.Row(fp, fp, null, if (item.isVideo) "video" else "image", VectorStore.SOURCE_PHONE, PHONE_VISION_TOKENS, q, s))
     if (item.isVideo) {
@@ -171,12 +206,18 @@ class PhoneIndexWorker(context: Context, params: WorkerParameters) : CoroutineWo
       for ((t, b64) in scenes) {
         if (isStopped) break
         val frame = decode(b64) ?: continue
-        val sv = try { search.embedFrames(listOf(frame)) } finally { frame.recycle() } ?: continue
+        val sv =
+          when (val r = try { search.embedFrames(listOf(frame)) } finally { frame.recycle() }) {
+            is Embedded.Ok -> r.vector
+            Embedded.BadInput -> continue
+            Embedded.Unavailable -> return ItemResult.Unavailable
+          }
         val (sq, ss) = VectorStore.pack(sv)
         out += VectorStore.Row("$fp#${Math.round(t * 1000)}", fp, t, "scene", VectorStore.SOURCE_PHONE, PHONE_VISION_TOKENS, sq, ss)
       }
+      if (isStopped) return ItemResult.Stopped
     }
-    return out
+    return ItemResult.Done(out)
   }
 
   /**
@@ -187,10 +228,15 @@ class PhoneIndexWorker(context: Context, params: WorkerParameters) : CoroutineWo
     if (!api.client.isLoggedIn) return
     val rows = store.all()
     val idsByFp = rows.values.groupBy({ it.fingerprint }, { it.mediaId })
+    val sentVideos = ArrayList<Long>()
     while (!isStopped) {
       // ordered by key: a video ("fp") comes before its scenes ("fp#ms")
       val pending = vectors.pending(400)
-      if (pending.isEmpty()) return
+      if (pending.isEmpty()) {
+        // all scenes are out too: the Mac sync must not send its own for these videos
+        store.markScenes(sentVideos, MediaIdStore.SCENE_VERSION)
+        return
+      }
       val items =
         pending.map { r ->
           val item = idsByFp[r.fingerprint]?.firstNotNullOfOrNull { byId[it] }
@@ -210,13 +256,15 @@ class PhoneIndexWorker(context: Context, params: WorkerParameters) : CoroutineWo
         }
       when (val res = api.putVectors(items)) {
         is ApiResult.Ok -> {
-          // rejected ones are not sent again either (they would fail the same way)
-          vectors.markSent(pending.map { it.key })
+          // rejected ones are not sent again (they would fail the same way); a rejected photo or
+          // video is no longer "pending", so the Mac path sends the file itself
+          val rejected = res.value.failed.mapTo(HashSet()) { f -> if (f.t != null) "${f.id}#${Math.round(f.t * 1000)}" else f.id }
+          vectors.markSent(pending.map { it.key }.filter { it !in rejected })
+          vectors.markSent(rejected, VectorStore.SOURCE_PHONE_REJECTED)
           val stored = res.value.stored.filter { it.t == null }.map { it.id }.toSet()
           val media = stored.flatMap { idsByFp[it].orEmpty() }.filter { byId.containsKey(it) }
           store.markIndexed(media) { byId.getValue(it).folder }
-          // scenes came with the video, so the Mac sync must not send its own
-          store.markScenes(media.filter { byId[it]?.isVideo == true }, MediaIdStore.SCENE_VERSION)
+          sentVideos += media.filter { byId[it]?.isVideo == true }
           if (res.value.failed.isNotEmpty()) Log.w(TAG, "${res.value.failed.size} vectors rejected: ${res.value.failed.take(3)}")
         }
         else -> {
@@ -268,11 +316,16 @@ class PhoneIndexWorker(context: Context, params: WorkerParameters) : CoroutineWo
     const val UNIQUE_PERIODIC = "phone_index_periodic"
 
     // indexing runs the GPU for a long time: only while charging
-    private val constraints = Constraints.Builder().setRequiresCharging(true).build()
+    private val constraints = Constraints.Builder().setRequiresCharging(true).setRequiresBatteryNotLow(true).build()
 
     fun runNow(context: Context) {
       WorkManager.getInstance(context)
         .enqueueUniqueWork(UNIQUE_NOW, ExistingWorkPolicy.KEEP, OneTimeWorkRequestBuilder<PhoneIndexWorker>().setConstraints(constraints).build())
+    }
+
+    fun cancelAll(context: Context) {
+      WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_NOW)
+      WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_PERIODIC)
     }
 
     fun schedulePeriodic(context: Context) {
