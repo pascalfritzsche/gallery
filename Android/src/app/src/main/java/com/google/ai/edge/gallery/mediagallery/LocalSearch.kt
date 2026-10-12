@@ -47,8 +47,8 @@ private const val OLD_PERIODIC_INDEX = "local_index_periodic"
 /** Measured: without this prompt the phone's query fits the Mac's vectors far worse (72 % vs 98 %). */
 const val QUERY_PREFIX = "task: search result | query: "
 
-/** The phone's image budget ends at 280 tokens (560 behaves the same). */
-const val PHONE_VISION_TOKENS = 280
+/** The model caps the image budget on the phone at 140 tokens (it logs "capping to 140"). */
+const val PHONE_VISION_TOKENS = 140
 
 /** [complete] = at least 90 % of the files in scope have a vector on the phone. */
 data class LocalHits(val items: List<MediaItem>, val times: Map<Long, Double>, val complete: Boolean)
@@ -66,6 +66,8 @@ constructor(
   private val idStore: MediaIdStore,
 ) {
   private val lock = Mutex()
+  // one inference at a time: search and the indexing worker share the embedder
+  private val inference = Mutex()
 
   /** The bundled allowlist has exactly this one model. */
   val model: Model? by lazy {
@@ -112,7 +114,7 @@ constructor(
   suspend fun search(query: String, scope: List<MediaItem>): LocalHits? {
     if (vectorCount() == 0) return null
     val e = embedder() ?: return null
-    val q = withContext(Dispatchers.Default) { e.generateTextEmbedding(QUERY_PREFIX + query) }?.takeIf { it.size == DIMS } ?: return null
+    val q = inference.withLock { withContext(Dispatchers.Default) { e.generateTextEmbedding(QUERY_PREFIX + query) } }?.takeIf { it.size == DIMS } ?: return null
     return rank(q, scope, seed = null)
   }
 
@@ -135,7 +137,7 @@ constructor(
                       d.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
                     }
                 }
-              withContext(Dispatchers.Default) { e.generateImageEmbedding(ImageUtils.encodeTga(bitmap)) }
+              inference.withLock { withContext(Dispatchers.Default) { e.generateImageEmbedding(ImageUtils.encodeTga(bitmap)) } }
             }
             .onFailure { Log.w(TAG, "local similar failed", it) }
             .getOrNull()
@@ -143,6 +145,21 @@ constructor(
         ?: return null
     if (v.size != DIMS || vectorCount() == 0) return null
     return rank(v, scope, seed = fp)
+  }
+
+  /** One vector from one or more frames (a video's first and last frame); null = no model or failed. */
+  suspend fun embedFrames(frames: List<android.graphics.Bitmap>): FloatArray? {
+    if (frames.isEmpty()) return null
+    val e = embedder() ?: return null
+    val tgas = frames.map { ImageUtils.encodeTga(it) }
+    return runCatching {
+        inference.withLock {
+          withContext(Dispatchers.Default) { if (tgas.size == 1) e.generateImageEmbedding(tgas[0]) else e.generateImagesEmbedding(tgas) }
+        }
+      }
+      .onFailure { Log.w(TAG, "embedding failed", it) }
+      .getOrNull()
+      ?.takeIf { it.size == DIMS }
   }
 
   private suspend fun rank(v: FloatArray, scope: List<MediaItem>, seed: String?): LocalHits {

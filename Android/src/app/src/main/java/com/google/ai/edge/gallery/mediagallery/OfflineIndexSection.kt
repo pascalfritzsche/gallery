@@ -29,7 +29,12 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
+import com.google.ai.edge.gallery.morgenschiss.PhoneIndexWorker
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -56,7 +61,30 @@ fun OfflineIndexSection(modelManager: ModelManagerViewModel, localSearch: LocalS
     val count by produceState(-1) { value = localSearch.vectorCount() }
     if (count >= 0) Text("Suchdaten auf dem Handy: $count Einträge", style = MaterialTheme.typography.bodySmall)
     ModelStatus(modelManager, status, model)
+    if (status?.status == ModelDownloadStatusType.SUCCEEDED) PhoneIndexStatus()
   }
+}
+
+/** The phone indexes new files itself while it charges. */
+@Composable
+private fun PhoneIndexStatus() {
+  val context = LocalContext.current
+  LaunchedEffect(Unit) { PhoneIndexWorker.runNow(context) }
+  val now by WorkManager.getInstance(context).getWorkInfosForUniqueWorkFlow(PhoneIndexWorker.UNIQUE_NOW).collectAsState(initial = emptyList())
+  val periodic by WorkManager.getInstance(context).getWorkInfosForUniqueWorkFlow(PhoneIndexWorker.UNIQUE_PERIODIC).collectAsState(initial = emptyList())
+  val info = (now + periodic).firstOrNull { it.state == WorkInfo.State.RUNNING } ?: now.firstOrNull()
+  val text =
+    when (info?.state) {
+      WorkInfo.State.RUNNING -> {
+        val done = info.progress.getInt(PhoneIndexWorker.KEY_DONE, 0)
+        val total = info.progress.getInt(PhoneIndexWorker.KEY_TOTAL, 0)
+        if (total > 0) "Handy indexiert neue Medien: $done von $total in dieser Runde" else "Handy indexiert neue Medien …"
+      }
+      WorkInfo.State.ENQUEUED -> "Das Handy indexiert neue Medien selbst, sobald es lädt."
+      WorkInfo.State.SUCCEEDED -> "Handy-Indexierung fertig, ${info.outputData.getInt(PhoneIndexWorker.KEY_DONE, 0)} neu."
+      else -> null
+    }
+  if (text != null) Text(text, style = MaterialTheme.typography.bodySmall)
 }
 
 /** On the start page until the model is there. */

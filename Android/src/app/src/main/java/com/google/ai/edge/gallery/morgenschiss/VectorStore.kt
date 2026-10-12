@@ -118,6 +118,29 @@ class VectorStore @Inject constructor(@ApplicationContext context: Context) :
     invalidate()
   }
 
+  /** Vectors the phone computed that morgenschiss does not have yet. */
+  fun pending(limit: Int): List<Row> {
+    val out = ArrayList<Row>()
+    readableDatabase.rawQuery("SELECT key, fp, t, kind, source, tokens, q, s FROM vec WHERE source = ? ORDER BY key LIMIT ?", arrayOf(SOURCE_PHONE, limit.toString())).use { c ->
+      while (c.moveToNext()) {
+        out += Row(c.getString(0), c.getString(1), if (c.isNull(2)) null else c.getDouble(2), c.getString(3), c.getString(4), c.getInt(5), c.getBlob(6), c.getFloat(7))
+      }
+    }
+    return out
+  }
+
+  @Synchronized
+  fun markSent(keys: Collection<String>) {
+    val db = writableDatabase
+    db.beginTransaction()
+    try {
+      for (k in keys) db.update("vec", ContentValues().apply { put("source", SOURCE_PHONE_SENT) }, "key = ?", arrayOf(k))
+      db.setTransactionSuccessful()
+    } finally {
+      db.endTransaction()
+    }
+  }
+
   /** Everything, e.g. after logging out. */
   @Synchronized
   fun clear() {
@@ -212,6 +235,13 @@ class VectorStore @Inject constructor(@ApplicationContext context: Context) :
   }
 
   companion object {
+    const val SOURCE_SERVER = "server"
+    /** Computed on the phone, not yet on morgenschiss. */
+    const val SOURCE_PHONE = "phone"
+    const val SOURCE_PHONE_SENT = "phone-sent"
+
+    fun encode(q: ByteArray): String = Base64.encodeToString(q, Base64.NO_WRAP)
+
     fun unpack(q: ByteArray, s: Float): FloatArray = FloatArray(q.size) { q[it] / 127f * s }
 
     /** int8 with one scale, like the server stores them. */

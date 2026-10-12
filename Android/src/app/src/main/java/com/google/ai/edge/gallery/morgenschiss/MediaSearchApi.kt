@@ -51,6 +51,26 @@ import kotlinx.serialization.json.decodeFromJsonElement
 
 @Serializable data class VectorsPage(val items: List<VectorItem> = emptyList(), val next: String? = null, val total: Int = 0, val at: String? = null)
 
+@Serializable data class PutVector(
+  val id: String,
+  val kind: String,
+  val tokens: Int,
+  val q: String,
+  val s: Float,
+  val t: Double? = null,
+  val mime: String? = null,
+  val size: Long? = null,
+  val takenAt: String? = null,
+  val folder: String? = null,
+  val name: String? = null,
+)
+
+@Serializable private data class PutRequest(val items: List<PutVector>)
+
+@Serializable data class PutStored(val id: String, val t: Double? = null)
+
+@Serializable data class PutResponse(val stored: List<PutStored> = emptyList(), val failed: List<IndexFailure> = emptyList())
+
 @Serializable data class Hit(val id: String, val score: Double, val t: Double? = null)
 
 /** A passage said in a video: [t] is where it starts. */
@@ -162,6 +182,10 @@ class MediaSearchApi @Inject constructor(val client: MorgenschissClient) {
     }
 
   suspend fun ids(): ApiResult<IdsResponse> = client.call("/api/mediasearch/ids", timeoutMs = 30_000).decode()
+
+  /** Vectors the phone computed itself; no Mac involved. At most 500 per call. */
+  suspend fun putVectors(items: List<PutVector>): ApiResult<PutResponse> =
+    client.call("/api/mediasearch/vectors/put", json.encodeToString(PutRequest(items)), timeoutMs = 60_000).decode()
 
   /** One page of the user's vectors (2000 are ~3 MB of JSON). */
   suspend fun vectors(after: String?, since: String?, limit: Int = 2000): ApiResult<VectorsPage> {
