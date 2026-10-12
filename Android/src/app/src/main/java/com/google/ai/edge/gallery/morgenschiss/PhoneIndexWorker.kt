@@ -175,9 +175,12 @@ class PhoneIndexWorker(context: Context, params: WorkerParameters) : CoroutineWo
     data object Unavailable : ItemResult
   }
 
-  /** Thermal status from Android; "moderate" means the phone already throttles. */
+  /**
+   * Thermal status from Android. "Moderate" came already at 40 °C battery while charging over USB
+   * (skin 38 °C, S26), which paused indexing for nothing; "severe" is when the phone really throttles.
+   */
   private fun tooHot(): Boolean =
-    applicationContext.getSystemService(PowerManager::class.java).currentThermalStatus >= PowerManager.THERMAL_STATUS_MODERATE
+    applicationContext.getSystemService(PowerManager::class.java).currentThermalStatus >= PowerManager.THERMAL_STATUS_SEVERE
 
   private suspend fun embedItem(search: LocalSearch, fp: String, item: MediaItem): ItemResult {
     val resolver = applicationContext.contentResolver
