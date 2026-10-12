@@ -80,7 +80,7 @@ private fun PhoneIndexStatus() {
         val total = info.progress.getInt(PhoneIndexWorker.KEY_TOTAL, 0)
         if (total > 0) "Handy indexiert neue Medien: $done von $total in dieser Runde" else "Handy indexiert neue Medien …"
       }
-      WorkInfo.State.ENQUEUED -> "Das Handy indexiert neue Medien selbst, sobald es lädt."
+      WorkInfo.State.ENQUEUED -> "Das Handy indexiert neue Medien selbst, solange der Akku nicht fast leer ist."
       WorkInfo.State.SUCCEEDED -> "Handy-Indexierung fertig, ${info.outputData.getInt(PhoneIndexWorker.KEY_DONE, 0)} neu."
       else -> null
     }
