@@ -21,10 +21,10 @@
         android:viewportHeight="108"
         android:viewportWidth="108">
       <path
-          android:fillColor="#FFFFFFFF"
+          android:fillColor="#FF0A0A0B"
           android:pathData="M0 0H108V108H0z" />
     </vector>
   </background>
-  <foreground android:drawable="@drawable/icon" />
-  <monochrome android:drawable="@drawable/icon" />
+  <foreground android:drawable="@drawable/ms_icon" />
+  <monochrome android:drawable="@drawable/ms_icon" />
 </adaptive-icon>
