@@ -87,6 +87,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -151,7 +153,8 @@ private fun neighbour(from: Projected, all: List<Projected>, dx: Float, dy: Floa
 fun BubbleScreen(viewModel: BubbleViewModel, onBack: () -> Unit, onOpen: (List<MediaItem>, Int) -> Unit) {
   LaunchedEffect(Unit) { if (viewModel.state !is Loadable.Done) viewModel.load() }
   val parent = viewModel.parent()
-  BackHandler { if (!viewModel.up()) onBack() }
+  // back: first the selection, then one level up, then out
+  BackHandler { if (!viewModel.back()) onBack() }
   var renaming by remember { mutableStateOf<Bubble?>(null) }
   renaming?.let { b -> RenameDialog(b, onDismiss = { renaming = null }) { name -> viewModel.rename(b, name); renaming = null } }
   var albumFor by remember { mutableStateOf<Bubble?>(null) }
@@ -176,7 +179,7 @@ fun BubbleScreen(viewModel: BubbleViewModel, onBack: () -> Unit, onOpen: (List<M
     topBar = {
       TopAppBar(
         title = { Text(parent?.title ?: "Bubbles", maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        navigationIcon = { IconButton(onClick = { if (!viewModel.up()) onBack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück") } },
+        navigationIcon = { IconButton(onClick = { if (!viewModel.back()) onBack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück") } },
       )
     }
   ) { padding ->
@@ -201,6 +204,39 @@ fun BubbleScreen(viewModel: BubbleViewModel, onBack: () -> Unit, onOpen: (List<M
   }
 }
 
+/** Convex hull (Andrew's monotone chain) of screen points, counter-clockwise. */
+private fun hull(points: List<Offset>): List<Offset> {
+  if (points.size < 3) return points
+  val sorted = points.sortedWith(compareBy({ it.x }, { it.y }))
+  fun cross(o: Offset, a: Offset, b: Offset) = (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x)
+  val lower = ArrayList<Offset>()
+  for (p in sorted) {
+    while (lower.size >= 2 && cross(lower[lower.size - 2], lower.last(), p) <= 0) lower.removeAt(lower.lastIndex)
+    lower += p
+  }
+  val upper = ArrayList<Offset>()
+  for (p in sorted.asReversed()) {
+    while (upper.size >= 2 && cross(upper[upper.size - 2], upper.last(), p) <= 0) upper.removeAt(upper.lastIndex)
+    upper += p
+  }
+  return lower.dropLast(1) + upper.dropLast(1)
+}
+
+private fun inside(poly: List<Offset>, t: Offset): Boolean {
+  var hit = false
+  var j = poly.lastIndex
+  for (i in poly.indices) {
+    val a = poly[i]
+    val b = poly[j]
+    if ((a.y > t.y) != (b.y > t.y) && t.x < (b.x - a.x) * (t.y - a.y) / (b.y - a.y) + a.x) hit = !hit
+    j = i
+  }
+  return hit
+}
+
+/** The outline of one bubble on screen: the hull of its items, pushed out a little. */
+private class Shape(val index: Int, val outline: List<Offset>, val centre: Offset, val depth: Float)
+
 @Composable
 private fun BubbleSpace(
   viewModel: BubbleViewModel,
@@ -209,48 +245,59 @@ private fun BubbleSpace(
   onRename: (Bubble) -> Unit,
   onAlbum: (Bubble) -> Unit,
 ) {
-  val focus = viewModel.focus.coerceIn(0, level.lastIndex)
-  val focused = level[focus]
-  val overview = viewModel.overview
-  // overview: the middle of the level, zoomed so every bubble fits
-  val middle = remember(level) { floatArrayOf(level.map { it.x }.average().toFloat(), level.map { it.y }.average().toFloat(), level.map { it.z }.average().toFloat()) }
-  val extent = remember(level) { level.maxOf { hypot(hypot(it.x - middle[0], it.y - middle[1]), it.z - middle[2]) + it.r }.coerceAtLeast(0.05f) }
-  // the camera glides to the focused bubble and zooms so it fills about a fifth of the screen
+  val focus = viewModel.focus.takeIf { it in level.indices }
+  val focused = focus?.let { level[it] }
+  // flattening thousands of members must not happen every animation frame
+  val levelMembers = remember(level) { level.map { it.allMembers() } }
+  // the outline wraps a bubble's core (80 % nearest its middle): with every outlier inside, the
+  // outlines of neighbouring bubbles covered each other almost completely
+  val cores = remember(level) {
+    level.mapIndexed { i, b ->
+      levelMembers[i].indices.sortedBy { j -> val m = levelMembers[i][j]; hypot(hypot(m.x - b.x, m.y - b.y), m.z - b.z) }
+        .take(maxOf(3, (levelMembers[i].size * 0.8f).toInt()))
+    }
+  }
+  // nothing selected: the whole level is in view, each item at its real place
+  val middle = remember(level) {
+    val all = levelMembers.flatten()
+    floatArrayOf(all.map { it.x }.average().toFloat(), all.map { it.y }.average().toFloat(), all.map { it.z }.average().toFloat())
+  }
+  val extent = remember(level) {
+    val d = levelMembers.flatten().map { hypot(hypot(it.x - middle[0], it.y - middle[1]), it.z - middle[2]) }.sorted()
+    (d.getOrNull((d.size * 0.98f).toInt()) ?: 0.5f).coerceAtLeast(0.05f)
+  }
   val anim = tween<Float>(durationMillis = 650)
-  val cx by animateFloatAsState(if (overview) middle[0] else focused.x, anim, label = "cx")
-  val cy by animateFloatAsState(if (overview) middle[1] else focused.y, anim, label = "cy")
-  val cz by animateFloatAsState(if (overview) middle[2] else focused.z, anim, label = "cz")
-  val fit = if (overview) 0.42f / (0.36f * extent) else 0.22f / (0.36f * focused.r.coerceAtLeast(0.02f))
+  val cx by animateFloatAsState(focused?.x ?: middle[0], anim, label = "cx")
+  val cy by animateFloatAsState(focused?.y ?: middle[1], anim, label = "cy")
+  val cz by animateFloatAsState(focused?.z ?: middle[2], anim, label = "cz")
+  val fit = if (focused == null) 0.45f / (0.36f * extent) else 0.22f / (0.36f * focused.r.coerceAtLeast(0.02f))
   val zoom by animateFloatAsState(fit.coerceIn(0.3f, 10f), anim, label = "zoom")
-  val members = remember(focused, viewModel.items) { focused.allMembers().mapNotNull { m -> viewModel.items[m.id]?.let { m to it } } }
+  val members = remember(focused, viewModel.items) { focused?.allMembers()?.mapNotNull { m -> viewModel.items[m.id]?.let { m to it } } ?: emptyList() }
   val loader = rememberGalleryImageLoader()
   val density = LocalDensity.current
-  // flattening and sorting thousands of members must not happen every animation frame
-  val levelMembers = remember(level) { level.map { it.allMembers() } }
 
   BoxWithConstraints(Modifier.fillMaxSize().background(Color(0xFF0E1216))) {
     val w = constraints.maxWidth.toFloat()
     val h = constraints.maxHeight.toFloat()
-    // the space sits above the sheet
-    val projector = Projector(cx, cy, cz, minOf(w, h) * 0.36f * zoom * viewModel.zoom, w / 2, h * (if (viewModel.sheetOpen) 0.22f else 0.42f), viewModel.yaw, viewModel.pitch)
-    val projected =
+    // the space sits above the sheet when a bubble is selected
+    val oy = h * (if (focused == null) 0.5f else if (viewModel.sheetOpen) 0.22f else 0.42f)
+    val projector = Projector(cx, cy, cz, minOf(w, h) * 0.36f * zoom * viewModel.zoom, w / 2, oy, viewModel.yaw, viewModel.pitch)
+    val pad = with(density) { 8.dp.toPx() }
+    val dotPoints = levelMembers.map { ms -> ms.map { m -> projector.project(m.x, m.y, m.z).let { Offset(it[0], it[1]) } } }
+    val shapes =
       level.mapIndexed { i, b ->
-        val p = projector.project(b.x, b.y, b.z)
-        Projected(i, p[0], p[1], b.r * p[3] * projector.scale, p[2])
+        val c = projector.project(b.x, b.y, b.z)
+        val centre = Offset(c[0], c[1])
+        // a little air around the outermost items
+        val outline = hull(cores[i].map { dotPoints[i][it] }).map { p -> val d = p - centre; val len = d.getDistance().coerceAtLeast(1f); p + d * (pad / len) }
+        Shape(i, outline, centre, c[2])
       }
-    val fp = projected[focus]
-    // bubbles between the camera and the focused one fade out
-    val inTheWay =
-      if (overview) emptySet()
-      else projected.filter { p -> p.index != focus && p.depth > fp.depth && hypot(p.x - fp.x, p.y - fp.y) < p.r + fp.r }.map { it.index }.toSet()
-    // depth fog: far bubbles fade, near ones stay strong, so the scene reads as space
-    val nearest = projected.maxOf { it.depth }
-    val farthest = projected.minOf { it.depth }
-    val fog = { p: Projected -> if (nearest > farthest) 0.35f + 0.65f * (p.depth - farthest) / (nearest - farthest) else 1f }
+    val nearest = shapes.maxOf { it.depth }
+    val farthest = shapes.minOf { it.depth }
+    val fog = { sh: Shape -> if (nearest > farthest) 0.4f + 0.6f * (sh.depth - farthest) / (nearest - farthest) else 1f }
     val highlight = members.getOrNull(viewModel.page)?.first
-    // the tap handler lives across recompositions: it must read the current projection
-    val currentProjected by rememberUpdatedState(projected)
-    val currentInTheWay by rememberUpdatedState(inTheWay)
+    // gesture handlers live across recompositions: they must read the current shapes
+    val currentShapes by rememberUpdatedState(shapes)
     val currentFocused by rememberUpdatedState(focused)
 
     Canvas(
@@ -263,38 +310,34 @@ private fun BubbleSpace(
           }
         }
         .pointerInput(level) {
-        detectTapGestures(
-          onTap = { t ->
-            currentProjected.filter { hypot(it.x - t.x, it.y - t.y) <= maxOf(it.r, 24.dp.toPx()) && it.index !in currentInTheWay }
-              .maxByOrNull { it.depth }
-              ?.let { viewModel.focusOn(it.index) }
-          },
-          onDoubleTap = { if (currentFocused.children.isNotEmpty()) viewModel.enter(currentFocused) },
-        )
-      }
+          detectTapGestures(
+            // a tap selects the nearest bubble under the finger; a tap on empty space clears it
+            onTap = { t -> viewModel.focusOn(currentShapes.filter { it.outline.size >= 3 && inside(it.outline, t) }.maxByOrNull { it.depth }?.index ?: -1) },
+            onDoubleTap = { currentFocused?.let { if (it.children.isNotEmpty()) viewModel.enter(it) } },
+          )
+        }
     ) {
-      for (p in projected.sortedBy { it.depth }) {
-        val b = level[p.index]
-        val base = pointColor(b.x, b.y, b.z, "JPEG")
-        val alpha = when {
-          p.index in inTheWay -> 0.12f
-          p.index == focus && !overview -> 0.55f
-          else -> 0.35f * fog(p)
-        }
-        drawCircle(
-          Brush.radialGradient(listOf(base.copy(alpha = alpha), base.copy(alpha = alpha * 0.35f)), center = Offset(p.x - p.r * 0.3f, p.y - p.r * 0.3f), radius = p.r * 1.3f),
-          p.r,
-          Offset(p.x, p.y),
-        )
-        if (p.index == focus) drawCircle(Color.White.copy(alpha = 0.8f), p.r, Offset(p.x, p.y), style = Stroke(1.5.dp.toPx()))
-        // members as dots; only the focused bubble shows them clearly
-        if (p.index !in inTheWay) {
-          val dotR = if (p.index == focus) 2.2.dp.toPx() else 1.2.dp.toPx()
-          for (m in levelMembers[p.index]) {
-            val q = projector.project(m.x, m.y, m.z)
-            drawCircle(Color.White.copy(alpha = if (p.index == focus) 0.75f else 0.35f * fog(p)), dotR, Offset(q[0], q[1]))
+      for (sh in shapes.sortedBy { it.depth }) {
+        val b = level[sh.index]
+        val selected = sh.index == focus
+        if (sh.outline.size >= 3) {
+          val path = Path().apply {
+            moveTo(sh.outline[0].x, sh.outline[0].y)
+            for (p in sh.outline.drop(1)) lineTo(p.x, p.y)
+            close()
           }
+          // only the selected bubble has colour; the rest are faint outlines, so the structure shows
+          if (selected) drawPath(path, pointColor(b.x, b.y, b.z, "JPEG").copy(alpha = 0.32f))
+          else drawPath(path, Color.White.copy(alpha = 0.035f * fog(sh)))
+          drawPath(
+            path,
+            Color.White.copy(alpha = if (selected) 0.85f else 0.16f * fog(sh)),
+            style = Stroke(width = (if (selected) 1.8.dp else 1.dp).toPx(), join = StrokeJoin.Round),
+          )
         }
+        val dotR = (if (selected) 2.2.dp else 1.4.dp).toPx()
+        val dotColor = Color.White.copy(alpha = if (selected) 0.9f else if (focus == null) 0.55f * fog(sh) else 0.3f * fog(sh))
+        for (q in dotPoints[sh.index]) drawCircle(dotColor, dotR, q)
       }
       highlight?.let { m ->
         val q = projector.project(m.x, m.y, m.z)
@@ -303,91 +346,91 @@ private fun BubbleSpace(
       }
     }
 
-    // callouts: a line up from the bubble to a balloon with its best pictures
-    // a neighbour's balloon must not sit on top of the focused bubble
-    val clearOfFocus = { p: Projected -> hypot(p.x - fp.x, p.y - p.r - fp.y) > fp.r + with(density) { 40.dp.toPx() } }
-    if (overview) {
-      // every bubble's name where there is room: big bubbles first, a label that would cover
-      // another waits until turning or zooming frees its spot
-      val labelW = with(density) { 96.dp.toPx() }
-      val labelH = with(density) { 20.dp.toPx() }
-      val placed = ArrayList<Offset>()
-      val free = projected
-        .filter { it.x in 0f..w && it.y in 0f..h }
-        .sortedByDescending { level[it.index].size }
-        .filter { p ->
-          val at = Offset(p.x, p.y - p.r)
-          (placed.none { abs(it.x - at.x) < labelW && abs(it.y - at.y) < labelH }).also { if (it) placed += at }
+    // every other bubble: its best picture in the middle, the name below; big ones first, a
+    // badge that would cover another waits until turning or zooming frees its spot
+    val badgeW = with(density) { 88.dp.toPx() }
+    val badgeH = with(density) { 64.dp.toPx() }
+    val placed = ArrayList<Offset>()
+    val badges = shapes
+      .filter { it.index != focus && it.centre.x in 0f..w && it.centre.y in 0f..h }
+      .sortedByDescending { level[it.index].size }
+      .filter { sh -> placed.none { abs(it.x - sh.centre.x) < badgeW && abs(it.y - sh.centre.y) < badgeH }.also { if (it) placed += sh.centre } }
+    for (sh in badges.sortedBy { it.depth }) {
+      val b = level[sh.index]
+      Column(
+        Modifier.offset { IntOffset((sh.centre.x - badgeW / 2).roundToInt(), (sh.centre.y - with(density) { 22.dp.toPx() }).roundToInt()) }
+          .width(88.dp)
+          .clickable { viewModel.focusOn(sh.index) },
+        horizontalAlignment = Alignment.CenterHorizontally,
+      ) {
+        b.previews.firstNotNullOfOrNull { viewModel.items[it] }?.let { item ->
+          AsyncImage(
+            model = MediaThumb(item.uri, 192),
+            imageLoader = loader,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            alpha = 0.55f + 0.45f * fog(sh),
+            modifier = Modifier.size(40.dp).clip(CircleShape),
+          )
         }
-      for (p in free.sortedBy { it.depth }) {
-        val b = level[p.index]
         Text(
           b.title,
-          color = Color.White.copy(alpha = 0.5f + 0.5f * fog(p)),
+          color = Color.White.copy(alpha = 0.55f + 0.45f * fog(sh)),
           style = MaterialTheme.typography.labelSmall,
           maxLines = 1,
           overflow = TextOverflow.Ellipsis,
-          modifier =
-            Modifier.offset { IntOffset((p.x - with(density) { 48.dp.toPx() }).roundToInt(), (p.y - p.r - with(density) { 22.dp.toPx() }).roundToInt()) }
-              .width(96.dp)
-              .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
-              .clickable { viewModel.focusOn(p.index) }
-              .padding(horizontal = 6.dp, vertical = 2.dp),
+          modifier = Modifier.padding(top = 2.dp).background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(6.dp)).padding(horizontal = 5.dp, vertical = 1.dp),
         )
       }
     }
-    val shown = if (overview) emptyList() else (listOf(fp) + projected.filter { it.index != focus && it.index !in inTheWay && clearOfFocus(it) }.sortedBy { hypot(it.x - fp.x, it.y - fp.y) }.take(4))
-      .filter { it.x in 0f..w && it.y in 0f..h }
-    for (p in shown) {
-      val b = level[p.index]
-      val top = p.y - p.r
-      val lineLen = with(density) { 28.dp.toPx() }
+
+    if (focused != null && focus != null) {
+      val sh = shapes[focus]
+      // the selected bubble: a line up from its top to a balloon with its best pictures
+      val top = (sh.outline.minOfOrNull { it.y } ?: sh.centre.y)
+      val lineLen = with(density) { 24.dp.toPx() }
       Canvas(Modifier.fillMaxSize()) {
-        drawLine(Color.White.copy(alpha = 0.6f), Offset(p.x, top), Offset(p.x, top - lineLen), strokeWidth = 1.5.dp.toPx())
+        drawLine(Color.White.copy(alpha = 0.6f), Offset(sh.centre.x, top), Offset(sh.centre.x, top - lineLen), strokeWidth = 1.5.dp.toPx())
       }
       Callout(
-        bubble = b,
+        bubble = focused,
         items = viewModel.items,
         loader = loader,
-        focused = p.index == focus,
-        modifier =
-          Modifier.offset { IntOffset((p.x - with(density) { 64.dp.toPx() }).roundToInt(), (top - lineLen - with(density) { 64.dp.toPx() }).roundToInt()) }
-            .clickable { viewModel.focusOn(p.index) },
+        focused = true,
+        modifier = Modifier.offset { IntOffset((sh.centre.x - with(density) { 64.dp.toPx() }).roundToInt(), (top - lineLen - with(density) { 64.dp.toPx() }).roundToInt()) },
       )
-    }
 
-    // arrows jump to the next bubble in that direction
-    val dirs = listOf(
-      Triple(Icons.Filled.KeyboardArrowLeft, -1f to 0f, Alignment.CenterStart),
-      Triple(Icons.Filled.KeyboardArrowRight, 1f to 0f, Alignment.CenterEnd),
-      Triple(Icons.Filled.KeyboardArrowUp, 0f to -1f, Alignment.TopCenter),
-      Triple(Icons.Filled.KeyboardArrowDown, 0f to 1f, Alignment.BottomCenter),
-    )
-    Box(Modifier.fillMaxWidth().fillMaxHeight(if (viewModel.sheetOpen) 0.45f else 0.78f).padding(8.dp)) {
-      FilledTonalIconButton(
-        onClick = { viewModel.overview = !overview; viewModel.zoom = 1f },
-        modifier = Modifier.align(Alignment.TopEnd),
-      ) {
-        Icon(if (overview) Icons.Filled.CenterFocusStrong else Icons.Filled.ZoomOutMap, if (overview) "Zur Bubble" else "Alle Bubbles zeigen")
-      }
-      if (!overview) for ((icon, d, align) in dirs) {
-        val target = neighbour(fp, projected, d.first, d.second)
-        if (target != null) {
-          FilledTonalIconButton(onClick = { viewModel.focusOn(target) }, modifier = Modifier.align(align)) { Icon(icon, "Nächste Bubble") }
+      // arrows jump to the next bubble in that direction, as seen from the current angle
+      val centres = shapes.map { Projected(it.index, it.centre.x, it.centre.y, 0f, it.depth) }
+      val dirs = listOf(
+        Triple(Icons.Filled.KeyboardArrowLeft, -1f to 0f, Alignment.CenterStart),
+        Triple(Icons.Filled.KeyboardArrowRight, 1f to 0f, Alignment.CenterEnd),
+        Triple(Icons.Filled.KeyboardArrowUp, 0f to -1f, Alignment.TopCenter),
+        Triple(Icons.Filled.KeyboardArrowDown, 0f to 1f, Alignment.BottomCenter),
+      )
+      Box(Modifier.fillMaxWidth().fillMaxHeight(if (viewModel.sheetOpen) 0.45f else 0.78f).padding(8.dp)) {
+        FilledTonalIconButton(onClick = { viewModel.focusOn(-1) }, modifier = Modifier.align(Alignment.TopEnd)) {
+          Icon(Icons.Filled.ZoomOutMap, "Alle Bubbles zeigen")
+        }
+        for ((icon, d, align) in dirs) {
+          val target = neighbour(centres[focus], centres, d.first, d.second)
+          if (target != null) {
+            FilledTonalIconButton(onClick = { viewModel.focusOn(target) }, modifier = Modifier.align(align)) { Icon(icon, "Nächste Bubble") }
+          }
         }
       }
-    }
 
-    BubbleSheet(
-      bubble = focused,
-      members = members.map { it.second },
-      viewModel = viewModel,
-      loader = loader,
-      onOpen = onOpen,
-      onRename = { onRename(focused) },
-      onAlbum = { onAlbum(focused) },
-      modifier = Modifier.align(Alignment.BottomCenter),
-    )
+      BubbleSheet(
+        bubble = focused,
+        members = members.map { it.second },
+        viewModel = viewModel,
+        loader = loader,
+        onOpen = onOpen,
+        onRename = { onRename(focused) },
+        onAlbum = { onAlbum(focused) },
+        modifier = Modifier.align(Alignment.BottomCenter),
+      )
+    }
   }
 }
 
