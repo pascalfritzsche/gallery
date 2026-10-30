@@ -307,9 +307,19 @@ private fun BubbleSpace(
     // a neighbour's balloon must not sit on top of the focused bubble
     val clearOfFocus = { p: Projected -> hypot(p.x - fp.x, p.y - p.r - fp.y) > fp.r + with(density) { 40.dp.toPx() } }
     if (overview) {
-      // every bubble with its name, nearest on top, so none stays hidden
-      for (p in projected.sortedBy { it.depth }) {
-        if (p.x !in 0f..w || p.y !in 0f..h) continue
+      // every bubble's name where there is room: big bubbles first, a label that would cover
+      // another waits until turning or zooming frees its spot
+      val labelW = with(density) { 96.dp.toPx() }
+      val labelH = with(density) { 20.dp.toPx() }
+      val placed = ArrayList<Offset>()
+      val free = projected
+        .filter { it.x in 0f..w && it.y in 0f..h }
+        .sortedByDescending { level[it.index].size }
+        .filter { p ->
+          val at = Offset(p.x, p.y - p.r)
+          (placed.none { abs(it.x - at.x) < labelW && abs(it.y - at.y) < labelH }).also { if (it) placed += at }
+        }
+      for (p in free.sortedBy { it.depth }) {
         val b = level[p.index]
         Text(
           b.title,
