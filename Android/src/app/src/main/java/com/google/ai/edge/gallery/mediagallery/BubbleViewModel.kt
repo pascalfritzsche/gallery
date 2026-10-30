@@ -59,7 +59,8 @@ constructor(
   var path by mutableStateOf<List<String>>(emptyList())
     private set
 
-  var focus by mutableIntStateOf(0)
+  /** Selected bubble of the level; -1 = none, the whole level in view. */
+  var focus by mutableIntStateOf(-1)
   var sheetOpen by mutableStateOf(false)
   /** Index of the previewed member of the focused bubble. */
   var page by mutableIntStateOf(0)
@@ -69,8 +70,6 @@ constructor(
   var pitch by mutableFloatStateOf(-0.35f)
   /** On top of the zoom that fits the focused bubble. */
   var zoom by mutableFloatStateOf(1f)
-  /** All bubbles of the level in view, each with its name. */
-  var overview by mutableStateOf(false)
 
   fun turn(dYaw: Float, dPitch: Float) {
     yaw += dYaw
@@ -96,7 +95,7 @@ constructor(
         idStore.all().values.mapNotNull { row -> lib.item(row.mediaId)?.let { row.fingerprint to it } }.toMap()
       }
       path = emptyList()
-      focus = 0
+      focus = -1
       page = 0
       state = Loadable.Done(r.value.bubbles)
     }
@@ -119,20 +118,29 @@ constructor(
     return found
   }
 
+  /** -1 clears the selection. */
   fun focusOn(index: Int) {
-    overview = false
     zoom = 1f
     if (index == focus) return
     focus = index
     page = 0
+    if (index < 0) sheetOpen = false
+  }
+
+  /** Back: clears the selection, else one level up; false when there is nothing left to undo. */
+  fun back(): Boolean {
+    if (focus >= 0) {
+      focusOn(-1)
+      return true
+    }
+    return up()
   }
 
   fun enter(bubble: Bubble) {
     if (bubble.children.isEmpty()) return
     path = path + bubble.key
-    overview = false
     zoom = 1f
-    focus = 0
+    focus = -1
     page = 0
   }
 
