@@ -17,6 +17,7 @@
 package com.google.ai.edge.gallery.mediagallery
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -63,6 +64,24 @@ constructor(
   /** Index of the previewed member of the focused bubble. */
   var page by mutableIntStateOf(0)
 
+  // the camera: turned by dragging, zoomed by pinching; kept here like the focus
+  var yaw by mutableFloatStateOf(0.55f)
+  var pitch by mutableFloatStateOf(-0.35f)
+  /** On top of the zoom that fits the focused bubble. */
+  var zoom by mutableFloatStateOf(1f)
+  /** All bubbles of the level in view, each with its name. */
+  var overview by mutableStateOf(false)
+
+  fun turn(dYaw: Float, dPitch: Float) {
+    yaw += dYaw
+    // past straight up or down the picture flips
+    pitch = (pitch + dPitch).coerceIn(-1.4f, 1.4f)
+  }
+
+  fun pinch(factor: Float) {
+    zoom = (zoom * factor).coerceIn(0.3f, 8f)
+  }
+
   fun load() {
     if (state is Loadable.Loading) return
     state = Loadable.Loading
@@ -101,6 +120,8 @@ constructor(
   }
 
   fun focusOn(index: Int) {
+    overview = false
+    zoom = 1f
     if (index == focus) return
     focus = index
     page = 0
@@ -109,6 +130,8 @@ constructor(
   fun enter(bubble: Bubble) {
     if (bubble.children.isEmpty()) return
     path = path + bubble.key
+    overview = false
+    zoom = 1f
     focus = 0
     page = 0
   }
@@ -117,6 +140,7 @@ constructor(
   fun up(): Boolean {
     val key = path.lastOrNull() ?: return false
     path = path.dropLast(1)
+    zoom = 1f
     focus = level().indexOfFirst { it.key == key }.coerceAtLeast(0)
     page = 0
     return true
