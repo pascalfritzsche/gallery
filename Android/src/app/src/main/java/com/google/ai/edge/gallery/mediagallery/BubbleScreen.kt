@@ -23,6 +23,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -46,6 +47,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CenterFocusStrong
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -53,6 +55,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.ZoomIn
+import androidx.compose.material.icons.filled.ZoomOutMap
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CircularProgressIndicator
@@ -99,19 +102,19 @@ import kotlin.math.hypot
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
-private const val YAW = 0.55f
-private const val PITCH = -0.35f
 private const val CAMERA = 4f
+/** Radians per pixel dragged: a drag across the screen turns the scene by about 200 degrees. */
+private const val TURN_PER_PX = 0.0035f
 
 /** A bubble projected onto the screen for the current camera. */
 private data class Projected(val index: Int, val x: Float, val y: Float, val r: Float, val depth: Float)
 
-/** Fixed view direction; only the centre and the zoom move. */
-private class Projector(val cx: Float, val cy: Float, val cz: Float, val scale: Float, val ox: Float, val oy: Float) {
-  private val cyaw = cos(YAW)
-  private val syaw = sin(YAW)
-  private val cp = cos(PITCH)
-  private val sp = sin(PITCH)
+/** Orbit camera around (cx, cy, cz): turned by yaw and pitch, zoomed by scale. */
+private class Projector(val cx: Float, val cy: Float, val cz: Float, val scale: Float, val ox: Float, val oy: Float, yaw: Float, pitch: Float) {
+  private val cyaw = cos(yaw)
+  private val syaw = sin(yaw)
+  private val cp = cos(pitch)
+  private val sp = sin(pitch)
 
   /** Returns screen x, screen y, depth (bigger = nearer) and the perspective factor. */
   fun project(x: Float, y: Float, z: Float): FloatArray {
@@ -208,12 +211,17 @@ private fun BubbleSpace(
 ) {
   val focus = viewModel.focus.coerceIn(0, level.lastIndex)
   val focused = level[focus]
+  val overview = viewModel.overview
+  // overview: the middle of the level, zoomed so every bubble fits
+  val middle = remember(level) { floatArrayOf(level.map { it.x }.average().toFloat(), level.map { it.y }.average().toFloat(), level.map { it.z }.average().toFloat()) }
+  val extent = remember(level) { level.maxOf { hypot(hypot(it.x - middle[0], it.y - middle[1]), it.z - middle[2]) + it.r }.coerceAtLeast(0.05f) }
   // the camera glides to the focused bubble and zooms so it fills about a fifth of the screen
   val anim = tween<Float>(durationMillis = 650)
-  val cx by animateFloatAsState(focused.x, anim, label = "cx")
-  val cy by animateFloatAsState(focused.y, anim, label = "cy")
-  val cz by animateFloatAsState(focused.z, anim, label = "cz")
-  val zoom by animateFloatAsState((0.22f / (0.36f * focused.r.coerceAtLeast(0.02f))).coerceIn(0.8f, 10f), anim, label = "zoom")
+  val cx by animateFloatAsState(if (overview) middle[0] else focused.x, anim, label = "cx")
+  val cy by animateFloatAsState(if (overview) middle[1] else focused.y, anim, label = "cy")
+  val cz by animateFloatAsState(if (overview) middle[2] else focused.z, anim, label = "cz")
+  val fit = if (overview) 0.42f / (0.36f * extent) else 0.22f / (0.36f * focused.r.coerceAtLeast(0.02f))
+  val zoom by animateFloatAsState(fit.coerceIn(0.3f, 10f), anim, label = "zoom")
   val members = remember(focused, viewModel.items) { focused.allMembers().mapNotNull { m -> viewModel.items[m.id]?.let { m to it } } }
   val loader = rememberGalleryImageLoader()
   val density = LocalDensity.current
@@ -224,7 +232,7 @@ private fun BubbleSpace(
     val w = constraints.maxWidth.toFloat()
     val h = constraints.maxHeight.toFloat()
     // the space sits above the sheet
-    val projector = Projector(cx, cy, cz, minOf(w, h) * 0.36f * zoom, w / 2, h * (if (viewModel.sheetOpen) 0.22f else 0.42f))
+    val projector = Projector(cx, cy, cz, minOf(w, h) * 0.36f * zoom * viewModel.zoom, w / 2, h * (if (viewModel.sheetOpen) 0.22f else 0.42f), viewModel.yaw, viewModel.pitch)
     val projected =
       level.mapIndexed { i, b ->
         val p = projector.project(b.x, b.y, b.z)
@@ -232,7 +240,13 @@ private fun BubbleSpace(
       }
     val fp = projected[focus]
     // bubbles between the camera and the focused one fade out
-    val inTheWay = projected.filter { p -> p.index != focus && p.depth > fp.depth && hypot(p.x - fp.x, p.y - fp.y) < p.r + fp.r }.map { it.index }.toSet()
+    val inTheWay =
+      if (overview) emptySet()
+      else projected.filter { p -> p.index != focus && p.depth > fp.depth && hypot(p.x - fp.x, p.y - fp.y) < p.r + fp.r }.map { it.index }.toSet()
+    // depth fog: far bubbles fade, near ones stay strong, so the scene reads as space
+    val nearest = projected.maxOf { it.depth }
+    val farthest = projected.minOf { it.depth }
+    val fog = { p: Projected -> if (nearest > farthest) 0.35f + 0.65f * (p.depth - farthest) / (nearest - farthest) else 1f }
     val highlight = members.getOrNull(viewModel.page)?.first
     // the tap handler lives across recompositions: it must read the current projection
     val currentProjected by rememberUpdatedState(projected)
@@ -240,7 +254,15 @@ private fun BubbleSpace(
     val currentFocused by rememberUpdatedState(focused)
 
     Canvas(
-      Modifier.fillMaxSize().pointerInput(level) {
+      Modifier.fillMaxSize()
+        // one finger turns the scene, two fingers zoom
+        .pointerInput(Unit) {
+          detectTransformGestures { _, pan, zoomChange, _ ->
+            viewModel.turn(pan.x * TURN_PER_PX, -pan.y * TURN_PER_PX)
+            viewModel.pinch(zoomChange)
+          }
+        }
+        .pointerInput(level) {
         detectTapGestures(
           onTap = { t ->
             currentProjected.filter { hypot(it.x - t.x, it.y - t.y) <= maxOf(it.r, 24.dp.toPx()) && it.index !in currentInTheWay }
@@ -256,8 +278,8 @@ private fun BubbleSpace(
         val base = pointColor(b.x, b.y, b.z, "JPEG")
         val alpha = when {
           p.index in inTheWay -> 0.12f
-          p.index == focus -> 0.55f
-          else -> 0.35f
+          p.index == focus && !overview -> 0.55f
+          else -> 0.35f * fog(p)
         }
         drawCircle(
           Brush.radialGradient(listOf(base.copy(alpha = alpha), base.copy(alpha = alpha * 0.35f)), center = Offset(p.x - p.r * 0.3f, p.y - p.r * 0.3f), radius = p.r * 1.3f),
@@ -270,7 +292,7 @@ private fun BubbleSpace(
           val dotR = if (p.index == focus) 2.2.dp.toPx() else 1.2.dp.toPx()
           for (m in levelMembers[p.index]) {
             val q = projector.project(m.x, m.y, m.z)
-            drawCircle(Color.White.copy(alpha = if (p.index == focus) 0.75f else 0.35f), dotR, Offset(q[0], q[1]))
+            drawCircle(Color.White.copy(alpha = if (p.index == focus) 0.75f else 0.35f * fog(p)), dotR, Offset(q[0], q[1]))
           }
         }
       }
@@ -284,7 +306,27 @@ private fun BubbleSpace(
     // callouts: a line up from the bubble to a balloon with its best pictures
     // a neighbour's balloon must not sit on top of the focused bubble
     val clearOfFocus = { p: Projected -> hypot(p.x - fp.x, p.y - p.r - fp.y) > fp.r + with(density) { 40.dp.toPx() } }
-    val shown = (listOf(fp) + projected.filter { it.index != focus && it.index !in inTheWay && clearOfFocus(it) }.sortedBy { hypot(it.x - fp.x, it.y - fp.y) }.take(4))
+    if (overview) {
+      // every bubble with its name, nearest on top, so none stays hidden
+      for (p in projected.sortedBy { it.depth }) {
+        if (p.x !in 0f..w || p.y !in 0f..h) continue
+        val b = level[p.index]
+        Text(
+          b.title,
+          color = Color.White.copy(alpha = 0.5f + 0.5f * fog(p)),
+          style = MaterialTheme.typography.labelSmall,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+          modifier =
+            Modifier.offset { IntOffset((p.x - with(density) { 48.dp.toPx() }).roundToInt(), (p.y - p.r - with(density) { 22.dp.toPx() }).roundToInt()) }
+              .width(96.dp)
+              .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
+              .clickable { viewModel.focusOn(p.index) }
+              .padding(horizontal = 6.dp, vertical = 2.dp),
+        )
+      }
+    }
+    val shown = if (overview) emptyList() else (listOf(fp) + projected.filter { it.index != focus && it.index !in inTheWay && clearOfFocus(it) }.sortedBy { hypot(it.x - fp.x, it.y - fp.y) }.take(4))
       .filter { it.x in 0f..w && it.y in 0f..h }
     for (p in shown) {
       val b = level[p.index]
@@ -312,7 +354,13 @@ private fun BubbleSpace(
       Triple(Icons.Filled.KeyboardArrowDown, 0f to 1f, Alignment.BottomCenter),
     )
     Box(Modifier.fillMaxWidth().fillMaxHeight(if (viewModel.sheetOpen) 0.45f else 0.78f).padding(8.dp)) {
-      for ((icon, d, align) in dirs) {
+      FilledTonalIconButton(
+        onClick = { viewModel.overview = !overview; viewModel.zoom = 1f },
+        modifier = Modifier.align(Alignment.TopEnd),
+      ) {
+        Icon(if (overview) Icons.Filled.CenterFocusStrong else Icons.Filled.ZoomOutMap, if (overview) "Zur Bubble" else "Alle Bubbles zeigen")
+      }
+      if (!overview) for ((icon, d, align) in dirs) {
         val target = neighbour(fp, projected, d.first, d.second)
         if (target != null) {
           FilledTonalIconButton(onClick = { viewModel.focusOn(target) }, modifier = Modifier.align(align)) { Icon(icon, "Nächste Bubble") }
