@@ -65,20 +65,29 @@ constructor(
   /** Index of the previewed member of the focused bubble. */
   var page by mutableIntStateOf(0)
 
-  // the camera: turned by dragging, zoomed by pinching; kept here like the focus
-  var yaw by mutableFloatStateOf(0.55f)
-  var pitch by mutableFloatStateOf(-0.35f)
-  /** On top of the zoom that fits the focused bubble. */
-  var zoom by mutableFloatStateOf(1f)
+  // the first-person camera: a position in the scene and where it looks; kept here like the
+  // focus, so opening a photo and coming back puts you where you were. NaN = not placed yet.
+  var camX by mutableFloatStateOf(Float.NaN)
+  var camY by mutableFloatStateOf(0f)
+  var camZ by mutableFloatStateOf(0f)
+  var yaw by mutableFloatStateOf(0f)
+  var pitch by mutableFloatStateOf(0f)
 
   fun turn(dYaw: Float, dPitch: Float) {
     yaw += dYaw
     // past straight up or down the picture flips
-    pitch = (pitch + dPitch).coerceIn(-1.4f, 1.4f)
+    pitch = (pitch + dPitch).coerceIn(-1.45f, 1.45f)
   }
 
-  fun pinch(factor: Float) {
-    zoom = (zoom * factor).coerceIn(0.3f, 8f)
+  fun moveTo(x: Float, y: Float, z: Float) {
+    camX = x
+    camY = y
+    camZ = z
+  }
+
+  /** Back to the start: outside the cloud, looking at it. */
+  fun resetCamera() {
+    camX = Float.NaN
   }
 
   fun load() {
@@ -120,7 +129,6 @@ constructor(
 
   /** -1 clears the selection. */
   fun focusOn(index: Int) {
-    zoom = 1f
     if (index == focus) return
     focus = index
     page = 0
@@ -139,7 +147,7 @@ constructor(
   fun enter(bubble: Bubble) {
     if (bubble.children.isEmpty()) return
     path = path + bubble.key
-    zoom = 1f
+    camX = Float.NaN
     focus = -1
     page = 0
   }
@@ -148,7 +156,7 @@ constructor(
   fun up(): Boolean {
     val key = path.lastOrNull() ?: return false
     path = path.dropLast(1)
-    zoom = 1f
+    camX = Float.NaN
     focus = level().indexOfFirst { it.key == key }.coerceAtLeast(0)
     page = 0
     return true
