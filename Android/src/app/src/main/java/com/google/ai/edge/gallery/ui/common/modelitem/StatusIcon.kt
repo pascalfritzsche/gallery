@@ -18,6 +18,7 @@ package com.google.ai.edge.gallery.ui.common.modelitem
 
 // import androidx.compose.ui.tooling.preview.Preview
 // import com.google.ai.edge.gallery.ui.theme.GalleryTheme
+import com.google.ai.edge.gallery.ui.theme.MsStatusError
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
@@ -90,7 +91,7 @@ fun StatusIcon(
         ModelDownloadStatusType.FAILED ->
           Icon(
             Icons.Rounded.Error,
-            tint = Color(0xFFAA0000),
+            tint = MsStatusError,
             contentDescription = stringResource(R.string.cd_download_failed_icon),
             modifier = Modifier.size(MODEL_INFO_ICON_SIZE),
           )

@@ -16,38 +16,55 @@
 
 package com.google.ai.edge.gallery.ui.theme
 
-import androidx.compose.ui.text.font.Font
 import androidx.compose.material3.Typography
+import androidx.compose.ui.text.ExperimentalTextApi
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.google.ai.edge.gallery.R
 
+// Fonts from the Interface (DESIGN.md "Typografie"): Sora for headings, IBM Plex Sans for
+// text, IBM Plex Mono for numbers. Sora and Plex Sans are variable fonts.
+@OptIn(ExperimentalTextApi::class)
+private fun variable(res: Int, weight: Int) =
+  Font(res, FontWeight(weight), variationSettings = FontVariation.Settings(FontVariation.weight(weight)))
+
+val displayFontFamily =
+  FontFamily(
+    variable(R.font.sora_latin, 400),
+    variable(R.font.sora_latin, 600),
+    variable(R.font.sora_latin, 700),
+  )
+
 val appFontFamily =
   FontFamily(
-    Font(R.font.nunito_regular, FontWeight.Normal),
-    Font(R.font.nunito_extralight, FontWeight.ExtraLight),
-    Font(R.font.nunito_light, FontWeight.Light),
-    Font(R.font.nunito_medium, FontWeight.Medium),
-    Font(R.font.nunito_semibold, FontWeight.SemiBold),
-    Font(R.font.nunito_bold, FontWeight.Bold),
-    Font(R.font.nunito_extrabold, FontWeight.ExtraBold),
-    Font(R.font.nunito_black, FontWeight.Black),
+    variable(R.font.ibm_plex_sans_latin, 300),
+    variable(R.font.ibm_plex_sans_latin, 400),
+    variable(R.font.ibm_plex_sans_latin, 500),
+    variable(R.font.ibm_plex_sans_latin, 600),
+    variable(R.font.ibm_plex_sans_latin, 700),
   )
+
+val monoFontFamily = FontFamily(Font(R.font.ibm_plex_mono_500_latin, FontWeight.Medium))
 
 val baseline = Typography()
 
+private fun TextStyle.display() = copy(fontFamily = displayFontFamily, fontWeight = FontWeight.Bold)
+
 val AppTypography =
   Typography(
-    displayLarge = baseline.displayLarge.copy(fontFamily = appFontFamily),
-    displayMedium = baseline.displayMedium.copy(fontFamily = appFontFamily),
-    displaySmall = baseline.displaySmall.copy(fontFamily = appFontFamily),
-    headlineLarge = baseline.headlineLarge.copy(fontFamily = appFontFamily),
-    headlineMedium = baseline.headlineMedium.copy(fontFamily = appFontFamily),
-    headlineSmall = baseline.headlineSmall.copy(fontFamily = appFontFamily),
-    titleLarge = baseline.titleLarge.copy(fontFamily = appFontFamily),
-    titleMedium = baseline.titleMedium.copy(fontFamily = appFontFamily),
-    titleSmall = baseline.titleSmall.copy(fontFamily = appFontFamily),
+    displayLarge = baseline.displayLarge.display(),
+    displayMedium = baseline.displayMedium.display(),
+    displaySmall = baseline.displaySmall.display(),
+    headlineLarge = baseline.headlineLarge.display(),
+    headlineMedium = baseline.headlineMedium.display(),
+    headlineSmall = baseline.headlineSmall.display(),
+    titleLarge = baseline.titleLarge.copy(fontFamily = appFontFamily, fontWeight = FontWeight.SemiBold),
+    titleMedium = baseline.titleMedium.copy(fontFamily = appFontFamily, fontWeight = FontWeight.SemiBold),
+    titleSmall = baseline.titleSmall.copy(fontFamily = appFontFamily, fontWeight = FontWeight.SemiBold),
     bodyLarge = baseline.bodyLarge.copy(fontFamily = appFontFamily),
     bodyMedium = baseline.bodyMedium.copy(fontFamily = appFontFamily),
     bodySmall = baseline.bodySmall.copy(fontFamily = appFontFamily),
@@ -55,6 +72,9 @@ val AppTypography =
     labelMedium = baseline.labelMedium.copy(fontFamily = appFontFamily),
     labelSmall = baseline.labelSmall.copy(fontFamily = appFontFamily),
   )
+
+/** Times, counts and measured values (DESIGN.md: IBM Plex Mono 500). */
+val numberStyle = baseline.labelMedium.copy(fontFamily = monoFontFamily, fontWeight = FontWeight.Medium)
 
 val titleMediumNarrow =
   baseline.titleMedium.copy(fontFamily = appFontFamily, letterSpacing = 0.0.sp)
@@ -90,17 +110,17 @@ val bodySmallMediumNarrowBold =
 
 val homePageTitleStyle =
   baseline.displayMedium.copy(
-    fontFamily = appFontFamily,
+    fontFamily = displayFontFamily,
     fontSize = 48.sp,
     lineHeight = 48.sp,
     letterSpacing = -1.sp,
-    fontWeight = FontWeight.Medium,
+    fontWeight = FontWeight.Bold,
   )
 
-val bodyLargeNarrow = baseline.bodyLarge.copy(letterSpacing = 0.2.sp)
-val bodyMediumMedium = baseline.bodyMedium.copy(fontWeight = FontWeight.Medium)
+val bodyLargeNarrow = baseline.bodyLarge.copy(fontFamily = appFontFamily, letterSpacing = 0.2.sp)
+val bodyMediumMedium = baseline.bodyMedium.copy(fontFamily = appFontFamily, fontWeight = FontWeight.Medium)
 
-val headlineLargeMedium = baseline.headlineLarge.copy(fontWeight = FontWeight.Medium)
+val headlineLargeMedium = baseline.headlineLarge.copy(fontFamily = displayFontFamily, fontWeight = FontWeight.SemiBold)
 
-val emptyStateTitle = baseline.headlineSmall.copy(fontSize = 37.sp, lineHeight = 50.sp)
-val emptyStateContent = baseline.headlineSmall.copy(fontSize = 16.sp, lineHeight = 22.sp)
+val emptyStateTitle = baseline.headlineSmall.copy(fontFamily = displayFontFamily, fontWeight = FontWeight.Bold, fontSize = 37.sp, lineHeight = 50.sp)
+val emptyStateContent = baseline.headlineSmall.copy(fontFamily = appFontFamily, fontSize = 16.sp, lineHeight = 22.sp)

@@ -16,18 +16,25 @@
 
 package com.google.ai.edge.gallery.mediagallery
 
+import com.google.ai.edge.gallery.ui.theme.MsStatusError
+import com.google.ai.edge.gallery.ui.theme.MsDataSeq5
+import com.google.ai.edge.gallery.ui.theme.MsDataSeq4
+import com.google.ai.edge.gallery.ui.theme.MsDataSeq3
+import com.google.ai.edge.gallery.ui.theme.MsDataSeq2
+import com.google.ai.edge.gallery.ui.theme.MsChart3
+import com.google.ai.edge.gallery.ui.theme.MsChart2
 import androidx.compose.ui.graphics.Color
 
 /** Formats other than JPEG mix this colour into their position colour. */
 private val formatColors =
   linkedMapOf(
-    "PNG" to Color(0xFFFF9800),
-    "HEIC" to Color(0xFF4CAF50),
-    "WebP" to Color(0xFF9C27B0),
-    "GIF" to Color(0xFFE91E63),
-    "MP4" to Color(0xFFF44336),
-    "Video" to Color(0xFFFFEB3B),
-    "Andere" to Color(0xFF9E9E9E),
+    "PNG" to MsDataSeq4,
+    "HEIC" to MsChart3,
+    "WebP" to MsDataSeq2,
+    "GIF" to MsDataSeq5,
+    "MP4" to MsStatusError,
+    "Video" to MsDataSeq3,
+    "Andere" to MsChart2,
   )
 
 fun formatOf(mime: String?, kind: String?): String {

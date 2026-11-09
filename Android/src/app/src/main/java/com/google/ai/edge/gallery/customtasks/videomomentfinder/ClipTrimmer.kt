@@ -16,6 +16,10 @@
 
 package com.google.ai.edge.gallery.customtasks.videomomentfinder
 
+import com.google.ai.edge.gallery.ui.theme.MsAccent
+import com.google.ai.edge.gallery.ui.theme.MsAccentContrast
+import com.google.ai.edge.gallery.ui.theme.MsSurfaceItem
+import com.google.ai.edge.gallery.ui.theme.MsSurfacePanel
 import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import android.util.Log
@@ -70,10 +74,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.google.ai.edge.gallery.proto.VideoMomentProject
-import com.google.ai.edge.gallery.ui.theme.onPrimaryDark
-import com.google.ai.edge.gallery.ui.theme.primaryDark
-import com.google.ai.edge.gallery.ui.theme.surfaceContainerDark
-import com.google.ai.edge.gallery.ui.theme.surfaceContainerHighestDark
 import java.io.File
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
@@ -254,7 +254,7 @@ fun ClipTrimmer(
         if (playheadViewportPx in 0f..totalWidthPx) {
           Surface(
             shape = RoundedCornerShape(10.dp),
-            color = surfaceContainerHighestDark,
+            color = MsSurfaceItem,
             modifier =
               Modifier.offset { IntOffset(clampedBadgeX.roundToInt(), 0) }
                 .width(badgeWidthDp)
@@ -283,7 +283,7 @@ fun ClipTrimmer(
           Modifier.fillMaxWidth()
             .height(trackHeightDp)
             .clip(RoundedCornerShape(8.dp))
-            .background(surfaceContainerDark)
+            .background(MsSurfacePanel)
       ) {
         // Main interactive canvas box
         Box(
@@ -395,7 +395,7 @@ fun ClipTrimmer(
                 Modifier.height(railThicknessDp)
                   .width(with(density) { selectionWidth.toDp() })
                   .offset { IntOffset(startViewportPx.roundToInt(), 0) }
-                  .background(primaryDark)
+                  .background(MsAccent)
             )
             // Bottom Rail
             Box(
@@ -408,7 +408,7 @@ fun ClipTrimmer(
                       with(density) { (trackHeightDp - railThicknessDp).toPx() }.roundToInt(),
                     )
                   }
-                  .background(primaryDark)
+                  .background(MsAccent)
             )
           }
 
@@ -427,7 +427,7 @@ fun ClipTrimmer(
                     bottomEnd = 0.dp,
                   )
                 )
-                .background(primaryDark)
+                .background(MsAccent)
                 .pointerInput(
                   windowStartMs,
                   windowEndMs,
@@ -460,7 +460,7 @@ fun ClipTrimmer(
             Icon(
               imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
               contentDescription = "Trim start handle",
-              tint = onPrimaryDark,
+              tint = MsAccentContrast,
               modifier = Modifier.size(16.dp),
             )
           }
@@ -480,7 +480,7 @@ fun ClipTrimmer(
                     bottomEnd = 8.dp,
                   )
                 )
-                .background(primaryDark)
+                .background(MsAccent)
                 .pointerInput(
                   windowStartMs,
                   windowEndMs,
@@ -510,7 +510,7 @@ fun ClipTrimmer(
             Icon(
               imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
               contentDescription = "Trim end handle",
-              tint = onPrimaryDark,
+              tint = MsAccentContrast,
               modifier = Modifier.size(16.dp),
             )
           }

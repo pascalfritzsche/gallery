@@ -17,6 +17,7 @@
 package com.google.ai.edge.gallery.mediagallery
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -95,7 +96,7 @@ fun SearchModelBanner(modelManager: ModelManagerViewModel) {
   val status = model?.let { ui.modelDownloadStatus[it.name] } ?: return
   if (status.status == ModelDownloadStatusType.SUCCEEDED) return
   Column(
-    Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(16.dp)).padding(12.dp),
+    Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer, MaterialTheme.shapes.large).border(1.dp, MaterialTheme.colorScheme.outline, MaterialTheme.shapes.large).padding(12.dp),
     verticalArrangement = Arrangement.spacedBy(8.dp),
   ) {
     Text("Für die Suche braucht die Galerie ihr Suchmodell (485 MB, am besten im WLAN).", style = MaterialTheme.typography.bodyMedium)

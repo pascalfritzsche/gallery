@@ -16,6 +16,9 @@
 
 package com.google.ai.edge.gallery.mediagallery
 
+import com.google.ai.edge.gallery.ui.theme.MsBgPageDeep
+import com.google.ai.edge.gallery.ui.theme.MsTextPrimary
+import com.google.ai.edge.gallery.ui.theme.MsFavorite
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -133,7 +136,7 @@ fun MediaViewerScreen(
     if (!current.isVideo) showTranscript = false
   }
 
-  Box(Modifier.fillMaxSize().background(Color.Black)) {
+  Box(Modifier.fillMaxSize().background(MsBgPageDeep)) {
     HorizontalPager(state = pager, beyondViewportPageCount = 1, key = { items[it].id }) { page ->
       val item = items[page]
       if (item.isVideo) {
@@ -143,29 +146,29 @@ fun MediaViewerScreen(
       }
     }
     AnimatedVisibility(chrome, enter = fadeIn(), exit = fadeOut()) {
-      Column(Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.45f)).statusBarsPadding()) {
+      Column(Modifier.fillMaxWidth().background(MsBgPageDeep.copy(alpha = 0.45f)).statusBarsPadding()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
           IconButton(onClick = onBack) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück", tint = Color.White)
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück", tint = MsTextPrimary)
           }
           Spacer(Modifier.weight(1f))
           actions(current)
           if (current.isVideo && transcript.available) {
             IconButton(onClick = { showTranscript = !showTranscript }) {
-              Icon(Icons.Filled.Subtitles, "Transkript", tint = Color.White)
+              Icon(Icons.Filled.Subtitles, "Transkript", tint = MsTextPrimary)
             }
           }
           IconButton(onClick = { mediaActions.favorite(listOf(current), !current.favorite) }) {
-            Icon(if (current.favorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder, "Favorit", tint = Color.White)
+            Icon(if (current.favorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder, "Favorit", tint = if (current.favorite) MsFavorite else MsTextPrimary)
           }
           IconButton(onClick = { mediaActions.share(listOf(current)) }) {
-            Icon(Icons.Filled.Share, "Teilen", tint = Color.White)
+            Icon(Icons.Filled.Share, "Teilen", tint = MsTextPrimary)
           }
           IconButton(onClick = { mediaActions.trash(listOf(current)) }) {
-            Icon(Icons.Filled.Delete, "Löschen", tint = Color.White)
+            Icon(Icons.Filled.Delete, "Löschen", tint = MsTextPrimary)
           }
           Box {
-            IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, "Mehr", tint = Color.White) }
+            IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, "Mehr", tint = MsTextPrimary) }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
               if (folders.isNotEmpty()) {
                 DropdownMenuItem(text = { Text("Verschieben") }, onClick = { menu = false; showMove = true })
@@ -177,8 +180,8 @@ fun MediaViewerScreen(
         }
         // own line: the icon row is longer for videos and would squeeze the name
         Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)) {
-          Text(current.name, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
-          Text(dateFormat.format(Date(current.takenAt)), color = Color.White.copy(alpha = 0.75f), maxLines = 1, style = MaterialTheme.typography.bodySmall)
+          Text(current.name, color = MsTextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
+          Text(dateFormat.format(Date(current.takenAt)), color = MsTextPrimary.copy(alpha = 0.75f), maxLines = 1, style = MaterialTheme.typography.bodySmall)
         }
       }
     }
