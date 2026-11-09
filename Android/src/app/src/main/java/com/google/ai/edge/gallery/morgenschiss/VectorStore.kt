@@ -201,6 +201,32 @@ class VectorStore @Inject constructor(@ApplicationContext context: Context) :
     return out
   }
 
+  /** Overview rows (no scenes) as int8 with 1/length per row, for grouping the library on the phone. */
+  class Overview(val ids: Array<String>, val video: BooleanArray, val q: ByteArray, val k: FloatArray)
+
+  fun overview(only: Set<String>? = null): Overview {
+    val ids = ArrayList<String>()
+    val video = ArrayList<Boolean>()
+    val ks = ArrayList<Float>()
+    val q = java.io.ByteArrayOutputStream()
+    readableDatabase.rawQuery("SELECT fp, kind, q FROM vec WHERE key = fp AND kind != 'scene'", null).use { c ->
+      while (c.moveToNext()) {
+        val fp = c.getString(0)
+        if (only != null && fp !in only) continue
+        val blob = c.getBlob(2)
+        if (blob.size != DIMS) continue
+        var n = 0L
+        for (b in blob) n += b * b
+        if (n == 0L) continue
+        ids += fp
+        video += c.getString(1) == "video"
+        ks += (1.0 / sqrt(n.toDouble())).toFloat()
+        q.write(blob)
+      }
+    }
+    return Overview(ids.toTypedArray(), video.toBooleanArray(), q.toByteArray(), ks.toFloatArray())
+  }
+
   /** The overview vector of a photo or video, for "similar". */
   fun vectorOf(fingerprint: String): FloatArray? =
     readableDatabase.rawQuery("SELECT q, s FROM vec WHERE key = ?", arrayOf(fingerprint)).use { c ->

@@ -157,6 +157,16 @@ constructor(
     return rank(v, scope, seed = fp)
   }
 
+  /** Text vectors with the search prompt (bubble labels); null without a model. */
+  suspend fun embedTexts(texts: List<String>): List<FloatArray>? {
+    val e = embedder() ?: return null
+    return inference.withLock {
+      withContext(Dispatchers.Default) {
+        texts.map { t -> runCatching { e.generateTextEmbedding(QUERY_PREFIX + t) }.getOrNull()?.takeIf { it.size == DIMS } ?: return@withContext null }
+      }
+    }
+  }
+
   /** One vector from one or more frames (a video's first and last frame). */
   suspend fun embedFrames(frames: List<android.graphics.Bitmap>): Embedded {
     if (frames.isEmpty()) return Embedded.BadInput

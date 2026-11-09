@@ -23,11 +23,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.ai.edge.gallery.morgenschiss.ApiResult
+import com.google.ai.edge.gallery.mediagallery.bubbles.BubbleRepository
+import com.google.ai.edge.gallery.mediagallery.bubbles.BubbleSnapshot
 import com.google.ai.edge.gallery.morgenschiss.Bubble
 import com.google.ai.edge.gallery.morgenschiss.MediaIdStore
-import com.google.ai.edge.gallery.morgenschiss.MediaSearchApi
-import com.google.ai.edge.gallery.morgenschiss.Scope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
@@ -42,7 +41,7 @@ import kotlinx.coroutines.withContext
 class BubbleViewModel
 @Inject
 constructor(
-  private val api: MediaSearchApi,
+  private val bubbles: BubbleRepository,
   private val idStore: MediaIdStore,
   private val repository: MediaRepository,
   private val albumRepo: AlbumRepository,
@@ -90,24 +89,46 @@ constructor(
     camX = Float.NaN
   }
 
-  fun load() {
-    if (state is Loadable.Loading) return
-    state = Loadable.Loading
+  /** True while the stored bubbles are brought up to date in the background. */
+  var updating by mutableStateOf(false)
+    private set
+
+  /** Stored bubbles at once, then new photos added (or everything regrouped on [regroup]). */
+  fun load(regroup: Boolean = false) {
+    if (updating) return
+    updating = true
     viewModelScope.launch {
-      val r = api.bubbles(Scope())
-      if (r !is ApiResult.Ok) {
-        state = Loadable.Error(errorText(r))
-        return@launch
+      try {
+        loadItems()
+        if (state !is Loadable.Done) bubbles.cached()?.let { show(it) } ?: run { state = Loadable.Loading }
+        show(bubbles.refresh(regroup))
+      } catch (c: kotlinx.coroutines.CancellationException) {
+        throw c
+      } catch (t: Throwable) {
+        android.util.Log.e("BubbleViewModel", "grouping failed", t)
+        if (state !is Loadable.Done) state = Loadable.Error("Die Bubbles ließen sich nicht berechnen.")
+      } finally {
+        updating = false
       }
-      items = withContext(Dispatchers.IO) {
-        val lib = repository.library.value
-        idStore.all().values.mapNotNull { row -> lib.item(row.mediaId)?.let { row.fingerprint to it } }.toMap()
-      }
-      path = emptyList()
-      focus = -1
-      page = 0
-      state = Loadable.Done(r.value.bubbles)
     }
+  }
+
+  private suspend fun loadItems() {
+    items = withContext(Dispatchers.IO) {
+      val lib = repository.library.value
+      idStore.all().values.mapNotNull { row -> lib.item(row.mediaId)?.let { row.fingerprint to it } }.toMap()
+    }
+  }
+
+  /** Keeps the level and focus when the bubbles there still exist (keys stay when photos are only added). */
+  private fun show(snap: BubbleSnapshot) {
+    val next = snap.toApi()
+    val focusKey = level().getOrNull(focus)?.key
+    state = Loadable.Done(next)
+    var list = next
+    for (key in path) list = list.firstOrNull { it.key == key }?.children ?: run { path = emptyList(); focus = -1; page = 0; camX = Float.NaN; return }
+    focus = list.indexOfFirst { it.key == focusKey }
+    if (focus < 0) page = 0
   }
 
   /** Bubbles of the current level. */
@@ -170,7 +191,12 @@ constructor(
    * server's best 90 %, each file only in its best album) and the folder they belong in.
    */
   suspend fun createAlbum(bubble: Bubble, name: String, folder: Boolean): Pair<List<MediaItem>, String>? {
-    val (album, error) = albumRepo.create(bubble.key, name.trim(), folder)
+    val core = bubbles.albumCore(bubble.key)
+    if (core == null) {
+      message = "Die Bubble ist nicht mehr da, bitte neu laden."
+      return null
+    }
+    val (album, error) = albumRepo.create(bubble.key, core, name.trim(), folder)
     message = error ?: if (folder) "Ordner \"${album!!.name}\" angelegt." else "Album \"${album!!.name}\" angelegt."
     if (album == null || !folder) return null
     val fps = albumRepo.members(album.id) ?: return null
@@ -178,25 +204,8 @@ constructor(
   }
 
   fun rename(bubble: Bubble, name: String) {
-    viewModelScope.launch {
-      if (api.nameBubble(bubble.key, name.trim()) is ApiResult.Ok) {
-        val done = state as? Loadable.Done ?: return@launch
-        state = Loadable.Done(done.value.map { renamed(it, bubble.key, name.trim().ifEmpty { null }) })
-      }
-    }
+    viewModelScope.launch { bubbles.rename(bubble.key, name)?.let { show(it) } }
   }
-
-  private fun renamed(b: Bubble, key: String, name: String?): Bubble =
-    if (b.key == key) b.copy(name = name) else b.copy(children = b.children.map { renamed(it, key, name) })
-
-  private fun errorText(r: ApiResult<*>): String =
-    when (r) {
-      is ApiResult.LoggedOut -> "Nicht angemeldet. In den Einstellungen bei morgenschiss anmelden."
-      is ApiResult.NoAccess -> "Dein Konto hat keinen Zugriff auf die Mediensuche."
-      is ApiResult.Unavailable -> "morgenschiss ist gerade nicht erreichbar."
-      is ApiResult.Busy -> "Der Server ist ausgelastet, bitte gleich nochmal."
-      else -> "Das hat nicht geklappt ($r)."
-    }
 }
 
 /** Members of a bubble; a parent's members are those of its children, best match first. */

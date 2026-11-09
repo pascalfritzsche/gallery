@@ -65,6 +65,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material.icons.filled.ZoomOutMap
 import androidx.compose.material3.AlertDialog
@@ -158,7 +159,8 @@ private class Camera(x: Float, y: Float, z: Float, yaw: Float, pitch: Float, val
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BubbleScreen(viewModel: BubbleViewModel, onBack: () -> Unit, onOpen: (List<MediaItem>, Int) -> Unit) {
-  LaunchedEffect(Unit) { if (viewModel.state !is Loadable.Done) viewModel.load() }
+  // every visit: the stored bubbles show at once, new photos are added in the background
+  LaunchedEffect(Unit) { viewModel.load() }
   val parent = viewModel.parent()
   // back: first the selection, then one level up, then out
   BackHandler { if (!viewModel.back()) onBack() }
@@ -187,6 +189,13 @@ fun BubbleScreen(viewModel: BubbleViewModel, onBack: () -> Unit, onOpen: (List<M
       TopAppBar(
         title = { Text(parent?.title ?: "Bubbles", maxLines = 1, overflow = TextOverflow.Ellipsis) },
         navigationIcon = { IconButton(onClick = { if (!viewModel.back()) onBack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück") } },
+        actions = {
+          if (viewModel.updating && viewModel.state is Loadable.Done) {
+            CircularProgressIndicator(Modifier.padding(end = 16.dp).size(20.dp), strokeWidth = 2.dp)
+          } else if (viewModel.state is Loadable.Done) {
+            IconButton(onClick = { viewModel.load(regroup = true) }) { Icon(Icons.Filled.Refresh, "Neu gruppieren") }
+          }
+        },
       )
     }
   ) { padding ->
@@ -195,7 +204,7 @@ fun BubbleScreen(viewModel: BubbleViewModel, onBack: () -> Unit, onOpen: (List<M
         is Loadable.Done -> {
           val level = viewModel.level()
           if (level.isEmpty()) {
-            Text("Noch zu wenige Medien am Server für Bubbles.", modifier = Modifier.padding(24.dp))
+            Text("Noch zu wenige indexierte Medien für Bubbles.", modifier = Modifier.padding(24.dp))
           } else {
             BubbleSpace(viewModel, level, onOpen, onRename = { renaming = it }, onAlbum = { albumFor = it })
           }

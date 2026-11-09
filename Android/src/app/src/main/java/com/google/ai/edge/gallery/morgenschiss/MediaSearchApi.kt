@@ -145,7 +145,14 @@ import kotlinx.serialization.json.decodeFromJsonElement
 
 @Serializable data class MatchResponse(val matches: Map<String, AlbumMatch> = emptyMap())
 
-@Serializable private data class CreateAlbumRequest(val key: String, val name: String, val mode: String)
+@Serializable private data class CreateAlbumRequest(
+  val key: String,
+  val name: String,
+  val mode: String,
+  // bubbles computed on the phone: the server takes the album straight from these
+  val centroid: com.google.ai.edge.gallery.mediagallery.bubbles.Packed? = null,
+  val threshold: Float? = null,
+)
 
 @Serializable private data class IdRequest(val id: String)
 
@@ -225,8 +232,13 @@ class MediaSearchApi @Inject constructor(val client: MorgenschissClient) {
 
   suspend fun albums(): ApiResult<AlbumsResponse> = client.call("/api/mediasearch/albums", timeoutMs = 30_000).decode()
 
-  suspend fun createAlbum(bubbleKey: String, name: String, folder: Boolean): ApiResult<Album> =
-    client.call("/api/mediasearch/albums/create", json.encodeToString(CreateAlbumRequest(bubbleKey, name, if (folder) "folder" else "album"))).decode()
+  suspend fun createAlbum(bubbleKey: String, core: com.google.ai.edge.gallery.mediagallery.bubbles.AlbumCore, name: String, folder: Boolean): ApiResult<Album> =
+    client
+      .call(
+        "/api/mediasearch/albums/create",
+        json.encodeToString(CreateAlbumRequest(bubbleKey, name, if (folder) "folder" else "album", core.centroid, core.threshold)),
+      )
+      .decode()
 
   suspend fun albumMembers(id: String): ApiResult<AlbumMembers> =
     client.call("/api/mediasearch/albums/members", json.encodeToString(IdRequest(id)), timeoutMs = 30_000).decode()

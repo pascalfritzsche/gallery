@@ -125,8 +125,6 @@ constructor(
 
   suspend fun deleteAlbum(id: String): Boolean = albumRepo.delete(id)
 
-  suspend fun createAlbum(bubbleKey: String, name: String, folder: Boolean) = albumRepo.create(bubbleKey, name, folder)
-
   fun clearPending(ids: Collection<Long>) = albumRepo.clearPending(ids)
   val library: StateFlow<MediaLibrary> = repository.library
   val session: StateFlow<Session?> = api.client.session
