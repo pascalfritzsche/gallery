@@ -38,7 +38,7 @@ data class VectorHit(val fingerprint: String, val t: Double?, val score: Float)
  */
 @Singleton
 class VectorStore @Inject constructor(@ApplicationContext context: Context) :
-  SQLiteOpenHelper(context, "vectors.db", null, 2) {
+  SQLiteOpenHelper(context, "vectors.db", null, 3) {
 
   override fun onCreate(db: SQLiteDatabase) {
     db.execSQL(
@@ -46,12 +46,14 @@ class VectorStore @Inject constructor(@ApplicationContext context: Context) :
         "source TEXT NOT NULL, tokens INTEGER NOT NULL, q BLOB NOT NULL, s REAL NOT NULL)"
     )
     db.execSQL("CREATE INDEX vec_fp ON vec(fp)")
-    onUpgrade(db, 1, 2)
+    onUpgrade(db, 1, 3)
   }
 
   override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
     // files the phone could not embed; the Mac path still tries them
     if (oldVersion < 2) db.execSQL("CREATE TABLE IF NOT EXISTS phone_failed (fp TEXT PRIMARY KEY)")
+    // up to 2 every video failed: its two frames did not fit the 256-token input; retry them all
+    if (oldVersion == 2) db.execSQL("DELETE FROM phone_failed")
   }
 
   fun phoneFailed(): Set<String> {
