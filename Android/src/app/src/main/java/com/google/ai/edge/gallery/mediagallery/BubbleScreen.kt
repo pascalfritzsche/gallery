@@ -293,18 +293,34 @@ private fun BubbleSpace(
   val scope = rememberCoroutineScope()
   var flight by remember { mutableStateOf<Job?>(null) }
 
-  // joystick: x = sideways, y = forward/back, both -1..1; moves at a fifth of the cloud per second
+  // joystick: x = sideways, y = forward/back, both -1..1. Full speed outside the cloud, slower
+  // among the stars: speed follows the distance to the nearest ones, so a dense spot is crossed slowly
   var stick by remember { mutableStateOf(Offset.Zero) }
+  val stars = remember(level) { levelMembers.flatten() }
   LaunchedEffect(stick != Offset.Zero) {
     if (stick == Offset.Zero) return@LaunchedEffect
     flight?.cancel()
     var last = 0L
+    var speed = Float.NaN
+    val near = FloatArray(5)
     while (true) {
       withFrameNanos { now ->
         if (last != 0L) {
           val dt = (now - last) / 1e9f
           val c = Camera(viewModel.camX, viewModel.camY, viewModel.camZ, viewModel.yaw, viewModel.pitch, 1f, 0f, 0f)
-          val v = extent * 0.45f * dt
+          near.fill(Float.MAX_VALUE)
+          for (m in stars) {
+            val d = hypot(hypot(m.x - viewModel.camX, m.y - viewModel.camY), m.z - viewModel.camZ)
+            if (d < near[4]) {
+              var i = 4
+              while (i > 0 && near[i - 1] > d) { near[i] = near[i - 1]; i-- }
+              near[i] = d
+            }
+          }
+          val gap = near.filter { it < Float.MAX_VALUE }.average().toFloat().takeIf { !it.isNaN() } ?: extent
+          val target = (gap * 1.2f).coerceIn(extent * 0.03f, extent * 0.45f)
+          speed = if (speed.isNaN()) target else speed + (target - speed) * minOf(1f, dt * 3f)
+          val v = speed * dt
           val fwd = -stick.y * v
           val side = stick.x * v
           viewModel.moveTo(viewModel.camX + c.fx * fwd + c.rx * side, viewModel.camY + c.fy * fwd, viewModel.camZ + c.fz * fwd + c.rz * side)
