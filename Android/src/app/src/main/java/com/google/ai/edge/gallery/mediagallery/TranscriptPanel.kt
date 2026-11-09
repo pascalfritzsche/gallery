@@ -16,6 +16,8 @@
 
 package com.google.ai.edge.gallery.mediagallery
 
+import com.google.ai.edge.gallery.ui.theme.MsBgPageDeep
+import com.google.ai.edge.gallery.ui.theme.MsTextPrimary
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -59,26 +61,26 @@ fun TranscriptPanel(
     modifier
       .fillMaxWidth()
       .fillMaxHeight(0.45f)
-      .background(Color.Black.copy(alpha = 0.85f), RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+      .background(MsBgPageDeep.copy(alpha = 0.85f), RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
       .navigationBarsPadding()
       .padding(16.dp),
     verticalArrangement = Arrangement.spacedBy(10.dp),
   ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-      Text("Transkript", color = Color.White, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-      IconButton(onClick = onClose) { Icon(Icons.Filled.Close, "Schließen", tint = Color.White) }
+      Text("Transkript", color = MsTextPrimary, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+      IconButton(onClick = onClose) { Icon(Icons.Filled.Close, "Schließen", tint = MsTextPrimary) }
     }
     when (val s = state) {
       TranscriptState.Idle -> {
         Text(
           "Die Tonspur geht an morgenschiss und wird dort mit Parakeet transkribiert. Danach springst du per Tippen an die Stelle.",
-          color = Color.White.copy(alpha = 0.8f),
+          color = MsTextPrimary.copy(alpha = 0.8f),
           style = MaterialTheme.typography.bodyMedium,
         )
         Button(onClick = { viewModel.start(item) }) { Text("Transkribieren") }
       }
       is TranscriptState.Working -> {
-        Text(s.step, color = Color.White)
+        Text(s.step, color = MsTextPrimary)
         if (s.progress != null) LinearProgressIndicator(progress = { s.progress }, modifier = Modifier.fillMaxWidth())
         else LinearProgressIndicator(Modifier.fillMaxWidth())
       }
@@ -88,7 +90,7 @@ fun TranscriptPanel(
       }
       is TranscriptState.Done ->
         if (s.sentences.isEmpty()) {
-          Text("Kein gesprochener Text erkannt.", color = Color.White.copy(alpha = 0.8f))
+          Text("Kein gesprochener Text erkannt.", color = MsTextPrimary.copy(alpha = 0.8f))
         } else {
           LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(s.sentences) { sentence ->
@@ -99,7 +101,7 @@ fun TranscriptPanel(
                   style = MaterialTheme.typography.labelMedium,
                   modifier = Modifier.width(56.dp),
                 )
-                Text(sentence.text, color = Color.White, style = MaterialTheme.typography.bodyMedium)
+                Text(sentence.text, color = MsTextPrimary, style = MaterialTheme.typography.bodyMedium)
               }
             }
           }

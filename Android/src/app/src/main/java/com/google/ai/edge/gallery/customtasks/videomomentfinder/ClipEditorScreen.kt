@@ -16,6 +16,9 @@
 
 package com.google.ai.edge.gallery.customtasks.videomomentfinder
 
+import com.google.ai.edge.gallery.ui.theme.MsAccentSoft
+import com.google.ai.edge.gallery.ui.theme.MsAccentSurface
+import com.google.ai.edge.gallery.ui.theme.MsBgPage
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -84,11 +87,6 @@ import com.google.ai.edge.gallery.common.logButtonClick
 import com.google.ai.edge.gallery.common.logErrorToFirebase
 import com.google.ai.edge.gallery.proto.VideoClip
 import com.google.ai.edge.gallery.proto.VideoMomentProject
-import com.google.ai.edge.gallery.ui.theme.onPrimaryContainerDark
-import com.google.ai.edge.gallery.ui.theme.onSecondaryContainerDark
-import com.google.ai.edge.gallery.ui.theme.primaryContainerDark
-import com.google.ai.edge.gallery.ui.theme.secondaryContainerDark
-import com.google.ai.edge.gallery.ui.theme.surfaceDark
 import java.io.File
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -211,7 +209,7 @@ fun ClipEditorScreen(
   Box(
     modifier =
       Modifier.fillMaxSize()
-        .background(surfaceDark)
+        .background(MsBgPage)
         // Consume tap events across the full screen so they do not leak through to
         // the underlying video player or controls.
         .clickable(
@@ -222,7 +220,7 @@ fun ClipEditorScreen(
   ) {
     Column(modifier = Modifier.fillMaxSize()) {
       // Top app bar with 56dp height
-      Box(modifier = Modifier.fillMaxWidth().height(56.dp).background(surfaceDark)) {
+      Box(modifier = Modifier.fillMaxWidth().height(56.dp).background(MsBgPage)) {
         Text(
           text = stringResource(R.string.videomomentfinder_save_or_edit_clips),
           style = MaterialTheme.typography.titleMedium,
@@ -382,7 +380,7 @@ fun ClipEditorScreen(
             modifier = Modifier.size(48.dp),
             colors =
               IconButtonDefaults.filledIconButtonColors(
-                containerColor = surfaceDark,
+                containerColor = MsBgPage,
                 contentColor = Color.White,
               ),
           ) {
@@ -490,17 +488,17 @@ fun ClipEditorScreen(
           modifier = Modifier.weight(1f),
           colors =
             ButtonDefaults.buttonColors(
-              containerColor = secondaryContainerDark,
-              contentColor = onSecondaryContainerDark,
-              disabledContainerColor = secondaryContainerDark.copy(alpha = 0.5f),
-              disabledContentColor = onSecondaryContainerDark.copy(alpha = 0.5f),
+              containerColor = MsAccentSurface,
+              contentColor = MsAccentSoft,
+              disabledContainerColor = MsAccentSurface.copy(alpha = 0.5f),
+              disabledContentColor = MsAccentSoft.copy(alpha = 0.5f),
             ),
         ) {
           if (isSaving) {
             CircularProgressIndicator(
               modifier = Modifier.size(18.dp),
               strokeWidth = 2.dp,
-              color = onSecondaryContainerDark,
+              color = MsAccentSoft,
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(text = stringResource(R.string.videomomentfinder_processing))
@@ -558,17 +556,17 @@ fun ClipEditorScreen(
           modifier = Modifier.weight(1f),
           colors =
             ButtonDefaults.buttonColors(
-              containerColor = primaryContainerDark,
-              contentColor = onPrimaryContainerDark,
-              disabledContainerColor = primaryContainerDark.copy(alpha = 0.5f),
-              disabledContentColor = onPrimaryContainerDark.copy(alpha = 0.5f),
+              containerColor = MsAccentSurface,
+              contentColor = MsAccentSoft,
+              disabledContainerColor = MsAccentSurface.copy(alpha = 0.5f),
+              disabledContentColor = MsAccentSoft.copy(alpha = 0.5f),
             ),
         ) {
           if (isExporting) {
             CircularProgressIndicator(
               modifier = Modifier.size(18.dp),
               strokeWidth = 2.dp,
-              color = onPrimaryContainerDark,
+              color = MsAccentSoft,
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(text = stringResource(R.string.videomomentfinder_processing))
@@ -606,10 +604,10 @@ private fun StepperIconButton(
     modifier = modifier,
     colors =
       IconButtonDefaults.filledIconButtonColors(
-        containerColor = secondaryContainerDark,
-        contentColor = onSecondaryContainerDark,
-        disabledContainerColor = secondaryContainerDark.copy(alpha = 0.38f),
-        disabledContentColor = onSecondaryContainerDark.copy(alpha = 0.38f),
+        containerColor = MsAccentSurface,
+        contentColor = MsAccentSoft,
+        disabledContainerColor = MsAccentSurface.copy(alpha = 0.38f),
+        disabledContentColor = MsAccentSoft.copy(alpha = 0.38f),
       ),
   ) {
     Icon(imageVector = icon, contentDescription = contentDescription)

@@ -16,6 +16,10 @@
 
 package com.google.ai.edge.gallery.mediagallery
 
+import com.google.ai.edge.gallery.ui.theme.MsBgPageDeep
+import com.google.ai.edge.gallery.ui.theme.MsTextPrimary
+import com.google.ai.edge.gallery.ui.theme.MsBgPage
+import com.google.ai.edge.gallery.ui.theme.MsAccent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -333,7 +337,7 @@ private fun BubbleSpace(
     if (index in level.indices) flyTo(level[index])
   }
 
-  BoxWithConstraints(Modifier.fillMaxSize().background(Color(0xFF0E1216))) {
+  BoxWithConstraints(Modifier.fillMaxSize().background(MsBgPage)) {
     val w = constraints.maxWidth.toFloat()
     val h = constraints.maxHeight.toFloat()
     val oy = h * (if (focused == null) 0.45f else if (viewModel.sheetOpen) 0.22f else 0.38f)
@@ -395,21 +399,21 @@ private fun BubbleSpace(
           val f = fog(sh.depth)
           // only the selected bubble has colour; the rest are faint outlines, so the structure shows
           if (selected) drawPath(path, pointColor(b.x, b.y, b.z, "JPEG").copy(alpha = 0.32f))
-          else drawPath(path, Color.White.copy(alpha = 0.035f * f))
-          drawPath(path, Color.White.copy(alpha = if (selected) 0.85f else 0.16f * f), style = Stroke(width = (if (selected) 1.8.dp else 1.dp).toPx(), join = StrokeJoin.Round))
+          else drawPath(path, MsTextPrimary.copy(alpha = 0.035f * f))
+          drawPath(path, MsTextPrimary.copy(alpha = if (selected) 0.85f else 0.16f * f), style = Stroke(width = (if (selected) 1.8.dp else 1.dp).toPx(), join = StrokeJoin.Round))
         }
         val base = (if (selected) 1.6.dp else 1.1.dp).toPx()
         for (q in stars[sh.index]) {
           if (q == null) continue
           // stars grow as you come closer
           val r = (base * (0.35f / q[2]).coerceIn(0.6f, 6f))
-          drawCircle(Color.White.copy(alpha = (if (selected) 0.95f else if (focus == null) 0.7f else 0.4f) * fog(q[2])), r, Offset(q[0], q[1]))
+          drawCircle(MsTextPrimary.copy(alpha = (if (selected) 0.95f else if (focus == null) 0.7f else 0.4f) * fog(q[2])), r, Offset(q[0], q[1]))
         }
       }
       highlight?.let { m ->
         cam.project(m.x, m.y, m.z)?.let { q ->
-          drawCircle(Color(0xFFFFD54F), 4.dp.toPx(), Offset(q[0], q[1]))
-          drawCircle(Color(0xFFFFD54F), 9.dp.toPx(), Offset(q[0], q[1]), style = Stroke(2.dp.toPx()))
+          drawCircle(MsAccent, 4.dp.toPx(), Offset(q[0], q[1]))
+          drawCircle(MsAccent, 9.dp.toPx(), Offset(q[0], q[1]), style = Stroke(2.dp.toPx()))
         }
       }
     }
@@ -464,11 +468,11 @@ private fun BubbleSpace(
         }
         Text(
           b.title,
-          color = Color.White.copy(alpha = 0.4f + 0.6f * f),
+          color = MsTextPrimary.copy(alpha = 0.4f + 0.6f * f),
           style = MaterialTheme.typography.labelSmall,
           maxLines = 1,
           overflow = TextOverflow.Ellipsis,
-          modifier = Modifier.padding(top = 2.dp).background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(6.dp)).padding(horizontal = 5.dp, vertical = 1.dp),
+          modifier = Modifier.padding(top = 2.dp).background(MsBgPageDeep.copy(alpha = 0.5f), RoundedCornerShape(8.dp)).padding(horizontal = 5.dp, vertical = 1.dp),
         )
       }
     }
@@ -480,7 +484,7 @@ private fun BubbleSpace(
         val top = sh.outline.minOf { it.y }
         val lineLen = with(density) { 24.dp.toPx() }
         Canvas(Modifier.fillMaxSize()) {
-          drawLine(Color.White.copy(alpha = 0.6f), Offset(sh.centre.x, top), Offset(sh.centre.x, top - lineLen), strokeWidth = 1.5.dp.toPx())
+          drawLine(MsTextPrimary.copy(alpha = 0.6f), Offset(sh.centre.x, top), Offset(sh.centre.x, top - lineLen), strokeWidth = 1.5.dp.toPx())
         }
         Callout(
           bubble = focused,
@@ -532,8 +536,8 @@ private fun Joystick(onMove: (Offset) -> Unit, modifier: Modifier, visible: Bool
   Box(
     modifier
       .size(120.dp)
-      .background(Color.White.copy(alpha = 0.06f), CircleShape)
-      .border(1.dp, Color.White.copy(alpha = 0.25f), CircleShape)
+      .background(MsTextPrimary.copy(alpha = 0.06f), CircleShape)
+      .border(1.dp, MsTextPrimary.copy(alpha = 0.25f), CircleShape)
       .semantics { contentDescription = "Steuerung: ziehen zum Fliegen" }
       .pointerInput(Unit) {
         val centre = Offset(size.width / 2f, size.height / 2f)
@@ -549,7 +553,7 @@ private fun Joystick(onMove: (Offset) -> Unit, modifier: Modifier, visible: Bool
       },
     contentAlignment = Alignment.Center,
   ) {
-    Box(Modifier.offset { IntOffset(knob.x.roundToInt(), knob.y.roundToInt()) }.size(44.dp).background(Color.White.copy(alpha = 0.35f), CircleShape))
+    Box(Modifier.offset { IntOffset(knob.x.roundToInt(), knob.y.roundToInt()) }.size(44.dp).background(MsTextPrimary.copy(alpha = 0.35f), CircleShape))
   }
 }
 
@@ -563,7 +567,7 @@ private fun Callout(bubble: Bubble, items: Map<String, MediaItem>, loader: coil.
   Column(
     modifier
       .width(128.dp)
-      .background(Color.Black.copy(alpha = if (focused) 0.8f else 0.6f), RoundedCornerShape(12.dp))
+      .background(MsBgPageDeep.copy(alpha = if (focused) 0.8f else 0.6f), RoundedCornerShape(12.dp))
       .padding(4.dp),
     horizontalAlignment = Alignment.CenterHorizontally,
   ) {
@@ -574,11 +578,11 @@ private fun Callout(bubble: Bubble, items: Map<String, MediaItem>, loader: coil.
           imageLoader = loader,
           contentDescription = null,
           contentScale = ContentScale.Crop,
-          modifier = Modifier.size(38.dp).clip(RoundedCornerShape(6.dp)),
+          modifier = Modifier.size(38.dp).clip(RoundedCornerShape(8.dp)),
         )
       }
     }
-    Text(bubble.title, color = Color.White, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    Text(bubble.title, color = MsTextPrimary, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
   }
 }
 
@@ -599,7 +603,7 @@ private fun BubbleSheet(
     modifier
       .fillMaxWidth()
       .then(if (open) Modifier.fillMaxHeight(0.62f) else Modifier)
-      .background(MaterialTheme.colorScheme.surfaceContainer, RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
+      .background(MaterialTheme.colorScheme.surfaceContainer, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
       .pointerInput(Unit) {
         // drag up opens the preview, drag down closes it
         var dy = 0f
@@ -647,7 +651,7 @@ private fun BubbleSheet(
           imageLoader = loader,
           contentDescription = members[i].name,
           contentScale = ContentScale.Fit,
-          modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)).background(Color.Black).clickable { onOpen(members, i) },
+          modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)).background(MsBgPageDeep).clickable { onOpen(members, i) },
         )
       }
       Text("${pager.currentPage + 1} / ${members.size}", style = MaterialTheme.typography.labelSmall, modifier = Modifier.align(Alignment.CenterHorizontally))

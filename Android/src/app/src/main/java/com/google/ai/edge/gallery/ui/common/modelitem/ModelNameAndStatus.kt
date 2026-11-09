@@ -16,6 +16,7 @@
 
 package com.google.ai.edge.gallery.ui.common.modelitem
 
+import com.google.ai.edge.gallery.ui.theme.MsFavorite
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -89,7 +90,7 @@ fun ModelNameAndStatus(
       ) {
         Icon(
           Icons.Filled.Star,
-          tint = Color(0xFFFCC934),
+          tint = MsFavorite,
           contentDescription = null,
           modifier = Modifier.size(18.dp),
         )

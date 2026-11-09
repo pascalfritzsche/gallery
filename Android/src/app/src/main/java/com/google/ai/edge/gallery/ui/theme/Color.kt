@@ -18,74 +18,62 @@ package com.google.ai.edge.gallery.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val primaryLight = Color(0xFF0B57D0)
-val onPrimaryLight = Color(0xFFFFFFFF)
-val primaryContainerLight = Color(0xFFD3E3FD)
-val onPrimaryContainerLight = Color(0xFF0842A0)
-val secondaryLight = Color(0xFF00639B)
-val onSecondaryLight = Color(0xFFFFFFFF)
-val secondaryContainerLight = Color(0xFFC2E7FF)
-val onSecondaryContainerLight = Color(0xFF004A77)
-val tertiaryLight = Color(0xFF146C2E)
-val onTertiaryLight = Color(0xFFFFFFFF)
-val tertiaryContainerLight = Color(0xFFC4EED0)
-val onTertiaryContainerLight = Color(0xFF0F5223)
-val errorLight = Color(0xFFB3261E)
-val onErrorLight = Color(0xFFFFFFFF)
-val errorContainerLight = Color(0xFFF9DEDC)
-val onErrorContainerLight = Color(0xFF8C1D18)
-val backgroundLight = Color(0xFFFFFFFF)
-val onBackgroundLight = Color(0xFF1F1F1F)
-val surfaceLight = Color(0xFFFFFFFF)
-val onSurfaceLight = Color(0xFF1F1F1F)
-val surfaceVariantLight = Color(0xFFE1E3E1)
-val onSurfaceVariantLight = Color(0xFF444746)
-val surfaceContainerLowestLight = Color(0xFFFFFFFF)
-val surfaceContainerLowLight = Color(0xFFF8FAFD)
-val surfaceContainerLight = Color(0xFFF0F4F9)
-val surfaceContainerHighLight = Color(0xFFE9EEF6)
-val surfaceContainerHighestLight = Color(0xFFDDE3EA)
-val inverseSurfaceLight = Color(0xFF303030)
-val inverseOnSurfaceLight = Color(0xFFF2F2F2)
-val outlineLight = Color(0xFF747775)
-val outlineVariantLight = Color(0xFFC4C7C5)
-val inversePrimaryLight = Color(0xFFA8C7FA)
-val surfaceDimLight = Color(0xFFD3DBE5)
-val surfaceBrightLight = Color(0xFFFFFFFF)
-val scrimLight = Color(0xFF000000)
+// Morgenschiss design tokens, mirrored from Interface client/Apps/Main/colors.min.css
+// (see DESIGN.md there). One dark scheme, no themes. Translucent surface tokens are
+// flattened onto the page background so sheets and dialogs stay opaque.
 
-val primaryDark = Color(0xFFA8C7FA)
-val onPrimaryDark = Color(0xFF062E6F)
-val primaryContainerDark = Color(0xFF0842A0)
-val onPrimaryContainerDark = Color(0xFFD3E3FD)
-val secondaryDark = Color(0xFF7FCFFF)
-val onSecondaryDark = Color(0xFF003355)
-val secondaryContainerDark = Color(0xFF004A77)
-val onSecondaryContainerDark = Color(0xFFC2E7FF)
-val tertiaryDark = Color(0xFF6DD58C)
-val onTertiaryDark = Color(0xFF0A3818)
-val tertiaryContainerDark = Color(0xFF0F5223)
-val onTertiaryContainerDark = Color(0xFFC4EED0)
-val errorDark = Color(0xFFF2B8B5)
-val onErrorDark = Color(0xFF601410)
-val errorContainerDark = Color(0xFF8C1D18)
-val onErrorContainerDark = Color(0xFFF9DEDC)
-val backgroundDark = Color(0xFF131314)
-val onBackgroundDark = Color(0xFFE3E3E3)
-val surfaceDark = Color(0xFF131314)
-val onSurfaceDark = Color(0xFFE3E3E3)
-val surfaceVariantDark = Color(0xFF444746)
-val onSurfaceVariantDark = Color(0xFFC4C7C5)
-val surfaceContainerLowestDark = Color(0xFF0E0E0E)
-val surfaceContainerLowDark = Color(0xFF1B1B1B)
-val surfaceContainerDark = Color(0xFF1E1F20)
-val surfaceContainerHighDark = Color(0xFF282A2C)
-val surfaceContainerHighestDark = Color(0xFF333537)
-val inverseSurfaceDark = Color(0xFFE3E3E3)
-val inverseOnSurfaceDark = Color(0xFF303030)
-val outlineDark = Color(0xFF8E918F)
-val outlineVariantDark = Color(0xFF444746)
-val inversePrimaryDark = Color(0xFF0B57D0)
-val surfaceDimDark = Color(0xFF131314)
-val surfaceBrightDark = Color(0xFF37393B)
-val scrimDark = Color(0xFF000000)
+// Backgrounds
+val MsBgPage = Color(0xFF0A0A0B) // --color-bg-page
+val MsBgPageAlt = Color(0xFF0E0E10) // --color-bg-page-alt
+val MsBgPageDeep = Color(0xFF050505) // --color-bg-page-deep
+val MsBgPopover = Color(0xFF121212) // --color-bg-popover
+val MsBackdrop = Color(0xB8050506) // --color-backdrop
+
+// Surfaces (rgba(255,255,255,a) over --color-bg-page)
+val MsSurfacePanelAlt = Color(0xFF141415) // --color-surface-panel-alt (.04)
+val MsSurfacePanel = Color(0xFF19191A) // --color-surface-panel (.06)
+val MsSurfaceItemMuted = Color(0xFF1E1E1F) // --color-surface-item-muted (.08)
+val MsSurfaceItem = Color(0xFF2C2C2D) // --color-surface-item (.14)
+val MsSurfaceItemStrong = Color(0xFF343435) // --color-surface-item-strong (.17)
+val MsSurfaceItemBright = Color(0xFF3B3B3C) // --color-surface-item-bright (.20)
+
+// Borders
+val MsBorderStrong = Color(0x29FFFFFF) // --color-border-strong
+val MsBorderMuted = Color(0x1AFFFFFF) // --color-border-muted
+val MsBorderFaint = Color(0x14FFFFFF) // --color-border-faint
+val MsBorderDashed = Color(0x38FFFFFF) // --color-border-dashed
+
+// Text
+val MsTextPrimary = Color(0xFFF4F4F5) // --color-text-primary
+val MsTextSecondary = Color(0xB8FFFFFF) // --color-text-secondary
+val MsTextMuted = Color(0x8CFFFFFF) // --color-text-muted
+
+// Accent (ice platinum) and titanium
+val MsAccent = Color(0xFF9EC3D1) // --color-accent-primary
+val MsAccentSoft = Color(0xFFCFE1E8) // --color-accent-primary-soft
+val MsAccentContrast = Color(0xFF0B1417) // --color-accent-primary-contrast
+val MsAccentSurface = Color(0xFF22282B) // accent at .16 over the page
+val MsTitanium = Color(0xFFC4C8CF) // --color-accent-secondary
+val MsFocusRing = Color(0xFF88C0D0) // --color-focus-ring
+val MsFavorite = Color(0xFFC9B27E) // --color-favorite, only the filled star
+
+// Status
+val MsStatusOk = Color(0xFF22C55E) // --color-status-ok
+val MsStatusOkText = Color(0xFF4ADE80) // --color-status-ok-text
+val MsStatusError = Color(0xFFEF4444) // --color-status-error
+val MsStatusErrorText = Color(0xFFFCA5A5) // --color-status-error-text
+val MsStatusErrorSurface = Color(0xFF2F1314) // error at .16 over the page
+
+// Data
+val MsChart1 = Color(0xFF9EC3D1) // --chart-1
+val MsChart2 = Color(0xFFC4C8CF) // --chart-2
+val MsChart3 = Color(0xFF79C79B) // --chart-3
+val MsChart4 = Color(0xFFC9B27E) // --chart-4
+val MsDataSeq1 = Color(0xFF2F5D7C) // --data-seq-1
+val MsDataSeq2 = Color(0xFF5F93AB) // --data-seq-2
+val MsDataSeq3 = Color(0xFFB9D3C8) // --data-seq-3
+val MsDataSeq4 = Color(0xFFE0B872) // --data-seq-4
+val MsDataSeq5 = Color(0xFFD9694F) // --data-seq-5
+val MsStatusWarn = Color(0xFFF59E0B) // --color-status-warn
+val MsStatusWarnText = Color(0xFFFCD34D) // --color-status-warn-text
+val MsStatusWarnSurface = Color(0xFF322412) // warn at .16 over the page

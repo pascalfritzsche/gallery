@@ -18,10 +18,10 @@ package com.google.ai.edge.gallery.ui.theme
 
 import android.app.Activity
 import android.os.Build
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
@@ -29,89 +29,63 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
-import com.google.ai.edge.gallery.proto.Theme
 
-private val lightScheme =
-  lightColorScheme(
-    primary = primaryLight,
-    onPrimary = onPrimaryLight,
-    primaryContainer = primaryContainerLight,
-    onPrimaryContainer = onPrimaryContainerLight,
-    secondary = secondaryLight,
-    onSecondary = onSecondaryLight,
-    secondaryContainer = secondaryContainerLight,
-    onSecondaryContainer = onSecondaryContainerLight,
-    tertiary = tertiaryLight,
-    onTertiary = onTertiaryLight,
-    tertiaryContainer = tertiaryContainerLight,
-    onTertiaryContainer = onTertiaryContainerLight,
-    error = errorLight,
-    onError = onErrorLight,
-    errorContainer = errorContainerLight,
-    onErrorContainer = onErrorContainerLight,
-    background = backgroundLight,
-    onBackground = onBackgroundLight,
-    surface = surfaceLight,
-    onSurface = onSurfaceLight,
-    surfaceVariant = surfaceVariantLight,
-    onSurfaceVariant = onSurfaceVariantLight,
-    outline = outlineLight,
-    outlineVariant = outlineVariantLight,
-    scrim = scrimLight,
-    inverseSurface = inverseSurfaceLight,
-    inverseOnSurface = inverseOnSurfaceLight,
-    inversePrimary = inversePrimaryLight,
-    surfaceDim = surfaceDimLight,
-    surfaceBright = surfaceBrightLight,
-    surfaceContainerLowest = surfaceContainerLowestLight,
-    surfaceContainerLow = surfaceContainerLowLight,
-    surfaceContainer = surfaceContainerLight,
-    surfaceContainerHigh = surfaceContainerHighLight,
-    surfaceContainerHighest = surfaceContainerHighestLight,
+// One scheme for the whole app, like the Interface (no light theme, no theme picker).
+private val msScheme =
+  darkColorScheme(
+    primary = MsAccent,
+    onPrimary = MsAccentContrast,
+    primaryContainer = MsAccentSurface,
+    onPrimaryContainer = MsAccentSoft,
+    inversePrimary = MsDataSeq1,
+    secondary = MsTitanium,
+    onSecondary = MsAccentContrast,
+    secondaryContainer = MsAccentSurface,
+    onSecondaryContainer = MsAccentSoft,
+    tertiary = MsChart3,
+    onTertiary = MsAccentContrast,
+    tertiaryContainer = MsSurfaceItem,
+    onTertiaryContainer = MsTextPrimary,
+    error = MsStatusErrorText,
+    onError = MsBgPage,
+    errorContainer = MsStatusErrorSurface,
+    onErrorContainer = MsStatusErrorText,
+    background = MsBgPage,
+    onBackground = MsTextPrimary,
+    surface = MsBgPage,
+    onSurface = MsTextPrimary,
+    surfaceVariant = MsSurfaceItemMuted,
+    onSurfaceVariant = MsTextSecondary,
+    // No tonal tint: elevated surfaces stay neutral, not blue.
+    surfaceTint = Color.Transparent,
+    inverseSurface = MsTextPrimary,
+    inverseOnSurface = MsBgPage,
+    outline = MsBorderStrong,
+    outlineVariant = MsBorderMuted,
+    scrim = MsBgPageDeep,
+    surfaceBright = MsSurfaceItemBright,
+    surfaceDim = MsBgPage,
+    surfaceContainerLowest = MsBgPageDeep,
+    surfaceContainerLow = MsSurfacePanelAlt,
+    surfaceContainer = MsSurfacePanel,
+    surfaceContainerHigh = MsBgPopover,
+    surfaceContainerHighest = MsSurfaceItem,
   )
 
-private val darkScheme =
-  darkColorScheme(
-    primary = primaryDark,
-    onPrimary = onPrimaryDark,
-    primaryContainer = primaryContainerDark,
-    onPrimaryContainer = onPrimaryContainerDark,
-    secondary = secondaryDark,
-    onSecondary = onSecondaryDark,
-    secondaryContainer = secondaryContainerDark,
-    onSecondaryContainer = onSecondaryContainerDark,
-    tertiary = tertiaryDark,
-    onTertiary = onTertiaryDark,
-    tertiaryContainer = tertiaryContainerDark,
-    onTertiaryContainer = onTertiaryContainerDark,
-    error = errorDark,
-    onError = onErrorDark,
-    errorContainer = errorContainerDark,
-    onErrorContainer = onErrorContainerDark,
-    background = backgroundDark,
-    onBackground = onBackgroundDark,
-    surface = surfaceDark,
-    onSurface = onSurfaceDark,
-    surfaceVariant = surfaceVariantDark,
-    onSurfaceVariant = onSurfaceVariantDark,
-    outline = outlineDark,
-    outlineVariant = outlineVariantDark,
-    scrim = scrimDark,
-    inverseSurface = inverseSurfaceDark,
-    inverseOnSurface = inverseOnSurfaceDark,
-    inversePrimary = inversePrimaryDark,
-    surfaceDim = surfaceDimDark,
-    surfaceBright = surfaceBrightDark,
-    surfaceContainerLowest = surfaceContainerLowestDark,
-    surfaceContainerLow = surfaceContainerLowDark,
-    surfaceContainer = surfaceContainerDark,
-    surfaceContainerHigh = surfaceContainerHighDark,
-    surfaceContainerHighest = surfaceContainerHighestDark,
+// Radii from DESIGN.md: icon button 10, input 12, card 18, panel/tile 20, global 24.
+val MsShapes =
+  Shapes(
+    extraSmall = RoundedCornerShape(10.dp),
+    small = RoundedCornerShape(12.dp),
+    medium = RoundedCornerShape(18.dp),
+    large = RoundedCornerShape(20.dp),
+    extraLarge = RoundedCornerShape(24.dp),
   )
 
 @Immutable
@@ -141,178 +115,52 @@ data class CustomColors(
   val newFeatureContainerColor: Color = Color.Transparent,
   val newFeatureTextColor: Color = Color.Transparent,
   val bgStarColor: Color = Color.Transparent,
-  val promoBannerBgBrush: Brush = Brush.verticalGradient(listOf(Color.Transparent)),
-  val promoBannerIconBgBrush: Brush = Brush.verticalGradient(listOf(Color.Transparent)),
+  val promoBannerBgBrush: Brush = SolidColor(Color.Transparent),
+  val promoBannerIconBgBrush: Brush = SolidColor(Color.Transparent),
 )
 
 val LocalCustomColors = staticCompositionLocalOf { CustomColors() }
 
-val lightCustomColors =
-  CustomColors(
-    appTitleGradientColors = listOf(Color(0xFF85B1F8), Color(0xFF3174F1)),
-    tabHeaderBgColor = Color(0xFF3174F1),
-    taskCardBgColor = surfaceContainerLowestLight,
-    taskBgColors =
-      listOf(
-        // red
-        Color(0xFFFFF5F5),
-        // green
-        Color(0xFFF4FBF6),
-        // blue
-        Color(0xFFF1F6FE),
-        // yellow
-        Color(0xFFFFFBF0),
-      ),
-    taskBgGradientColors =
-      listOf(
-        // red
-        listOf(Color(0xFFE25F57), Color(0xFFDB372D)),
-        // green
-        listOf(Color(0xFF41A15F), Color(0xFF128937)),
-        // blue
-        listOf(Color(0xFF669DF6), Color(0xFF3174F1)),
-        // yellow
-        listOf(Color(0xFFFDD45D), Color(0xFFCAA12A)),
-      ),
-    taskIconColors =
-      listOf(
-        // red.
-        Color(0xFFDB372D),
-        // green
-        Color(0xFF128937),
-        // blue
-        Color(0xFF3174F1),
-        // yellow
-        Color(0xFFCAA12A),
-      ),
-    taskIconShapeBgColor = Color.White,
-    homeBottomGradient = listOf(Color(0x00F8F9FF), Color(0xffFFEFC9)),
-    agentBubbleBgColor = Color(0xFFe9eef6),
-    userBubbleBgColor = Color(0xFF32628D),
-    linkColor = Color(0xFF32628D),
-    successColor = Color(0xff3d860b),
-    positiveStrokeColor = Color(0xff3d860b),
-    negativeStrokeColor = Color(0xffd93025),
-    lassoStrokeColor = Color(0xFF00639B),
-    recordButtonBgColor = Color(0xFFEE675C),
-    waveFormBgColor = Color(0xFFaaaaaa),
-    modelInfoIconColor = Color(0xFFCCCCCC),
-    warningContainerColor = Color(0xfffef7e0),
-    warningTextColor = Color(0xffe37400),
-    errorContainerColor = Color(0xfffce8e6),
-    errorTextColor = Color(0xffd93025),
-    newFeatureContainerColor = Color(0xFFEEDCFE),
-    newFeatureTextColor = Color(0xFF400B84),
-    bgStarColor = Color(0x3A669AF5),
-    promoBannerBgBrush =
-      Brush.linearGradient(
-        colorStops =
-          arrayOf(
-            0.0f to Color(0x42ACB7FF),
-            0.6154f to Color(0x422D96FF),
-            1.0f to Color(0x423C6BFF),
-          ),
-        start = Offset(0f, 0f),
-        end = Offset(0f, Float.POSITIVE_INFINITY),
-      ),
-    promoBannerIconBgBrush =
-      Brush.linearGradient(
-        colorStops =
-          arrayOf(
-            0.2442f to Color(0x3B446EFF),
-            0.4296f to Color(0x3B2E96FF),
-            0.6651f to Color(0x3BB1C5FF),
-          ),
-        start = Offset(0f, 1f),
-        end = Offset(1f, 0f),
-      ),
-  )
+// No gradients (DESIGN.md rule 5): every former gradient pair is one flat token twice.
+private val taskIcons = listOf(MsChart1, MsChart2, MsChart3, MsDataSeq2)
 
-val darkCustomColors =
+val msCustomColors =
   CustomColors(
-    appTitleGradientColors = listOf(Color(0xFF85B1F8), Color(0xFF3174F1)),
-    tabHeaderBgColor = Color(0xFF3174F1),
-    taskCardBgColor = surfaceContainerHighDark,
-    taskBgColors =
-      listOf(
-        // red
-        Color(0xFF181210),
-        // green
-        Color(0xFF131711),
-        // blue
-        Color(0xFF191924),
-        // yellow
-        Color(0xFF1A1813),
-      ),
-    taskBgGradientColors =
-      listOf(
-        // red
-        listOf(Color(0xFFE25F57), Color(0xFFDB372D)),
-        // green
-        listOf(Color(0xFF41A15F), Color(0xFF128937)),
-        // blue
-        listOf(Color(0xFF669DF6), Color(0xFF3174F1)),
-        // yellow
-        listOf(Color(0xFFFDD45D), Color(0xFFCAA12A)),
-      ),
-    taskIconColors =
-      listOf(
-        // red.
-        Color(0xFFE25F57),
-        // green
-        Color(0xFF41A15F),
-        // blue
-        Color(0xFF669DF6),
-        // yellow
-        Color(0xFFCAA12A),
-      ),
-    taskIconShapeBgColor = Color(0xFF202124),
-    homeBottomGradient = listOf(Color(0x00F8F9FF), Color(0x1AF6AD01)),
-    agentBubbleBgColor = Color(0xFF1b1c1d),
-    userBubbleBgColor = Color(0xFF1f3760),
-    linkColor = Color(0xFF9DCAFC),
-    successColor = Color(0xFFA1CE83),
-    positiveStrokeColor = Color(0xff3d860b),
-    negativeStrokeColor = Color(0xffd93025),
-    lassoStrokeColor = Color(0xFF00639B),
-    recordButtonBgColor = Color(0xFFEE675C),
-    waveFormBgColor = Color(0xFFaaaaaa),
-    modelInfoIconColor = Color(0xFFCCCCCC),
-    warningContainerColor = Color(0xff554c33),
-    warningTextColor = Color(0xfffcc934),
-    errorContainerColor = Color(0xff523a3b),
-    errorTextColor = Color(0xffee675c),
-    newFeatureContainerColor = Color(0xFFEEDCFE),
-    newFeatureTextColor = Color(0xFF400B84),
-    bgStarColor = Color(0x19346BF0),
-    promoBannerBgBrush =
-      Brush.linearGradient(
-        colorStops = arrayOf(0.0f to Color(0x82183570), 0.8077f to Color(0x820A122D)),
-        start = Offset(0f, 0f),
-        end = Offset(0f, Float.POSITIVE_INFINITY),
-      ),
-    promoBannerIconBgBrush =
-      Brush.linearGradient(
-        colorStops =
-          arrayOf(
-            0.2442f to Color(0x6F0F41F8),
-            0.4296f to Color(0x6F1685F8),
-            0.6651f to Color(0x6F809EF3),
-          ),
-        start = Offset(0f, 1f),
-        end = Offset(1f, 0f),
-      ),
+    appTitleGradientColors = listOf(MsTextPrimary, MsTextPrimary),
+    tabHeaderBgColor = MsAccent,
+    taskCardBgColor = MsSurfacePanel,
+    taskBgColors = listOf(MsSurfacePanel, MsSurfacePanel, MsSurfacePanel, MsSurfacePanel),
+    taskBgGradientColors = taskIcons.map { listOf(it, it) },
+    taskIconColors = taskIcons,
+    taskIconShapeBgColor = MsSurfaceItemMuted,
+    homeBottomGradient = listOf(Color.Transparent, Color.Transparent),
+    agentBubbleBgColor = MsSurfacePanel,
+    userBubbleBgColor = MsAccentSurface,
+    linkColor = MsAccent,
+    successColor = MsStatusOkText,
+    positiveStrokeColor = MsStatusOk,
+    negativeStrokeColor = MsStatusError,
+    lassoStrokeColor = MsAccent,
+    recordButtonBgColor = MsStatusError,
+    waveFormBgColor = MsTextMuted,
+    modelInfoIconColor = MsTextMuted,
+    warningContainerColor = MsStatusWarnSurface,
+    warningTextColor = MsStatusWarnText,
+    errorContainerColor = MsStatusErrorSurface,
+    errorTextColor = MsStatusErrorText,
+    newFeatureContainerColor = MsAccentSurface,
+    newFeatureTextColor = MsAccentSoft,
+    bgStarColor = MsBorderFaint,
+    promoBannerBgBrush = SolidColor(MsSurfacePanel),
+    promoBannerIconBgBrush = SolidColor(MsSurfaceItemMuted),
   )
 
 val MaterialTheme.customColors: CustomColors
   @Composable @ReadOnlyComposable get() = LocalCustomColors.current
 
-/**
- * Controls the color of the phone's status bar icons based on whether the app is using a dark
- * theme.
- */
+/** Light status and navigation bar icons on the dark page background. */
 @Composable
-fun StatusBarColorController(useDarkTheme: Boolean) {
+fun StatusBarColorController() {
   val view = LocalView.current
   val currentWindow = (view.context as? Activity)?.window
 
@@ -320,35 +168,28 @@ fun StatusBarColorController(useDarkTheme: Boolean) {
     SideEffect {
       WindowCompat.setDecorFitsSystemWindows(currentWindow, false)
       val controller = WindowCompat.getInsetsController(currentWindow, view)
-      controller.isAppearanceLightStatusBars = !useDarkTheme // Set to true for light icons
+      controller.isAppearanceLightStatusBars = false
+      controller.isAppearanceLightNavigationBars = false
     }
   }
 }
 
 @Composable
 fun GalleryTheme(content: @Composable () -> Unit) {
-  val themeOverride = ThemeSettings.themeOverride
-  val darkTheme: Boolean =
-    (isSystemInDarkTheme() || themeOverride.value == Theme.THEME_DARK) &&
-      themeOverride.value != Theme.THEME_LIGHT
   val view = LocalView.current
 
-  StatusBarColorController(useDarkTheme = darkTheme)
+  StatusBarColorController()
 
-  val colorScheme =
-    when {
-      darkTheme -> darkScheme
-      else -> lightScheme
-    }
-
-  val customColorsPalette = if (darkTheme) darkCustomColors else lightCustomColors
-
-  CompositionLocalProvider(LocalCustomColors provides customColorsPalette) {
-    MaterialTheme(colorScheme = colorScheme, typography = AppTypography, content = content)
+  CompositionLocalProvider(LocalCustomColors provides msCustomColors) {
+    MaterialTheme(
+      colorScheme = msScheme,
+      typography = AppTypography,
+      shapes = MsShapes,
+      content = content,
+    )
   }
 
-  // Make sure the navigation bar stays transparent on manual theme changes.
-  LaunchedEffect(darkTheme) {
+  LaunchedEffect(Unit) {
     val window = (view.context as Activity).window
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {

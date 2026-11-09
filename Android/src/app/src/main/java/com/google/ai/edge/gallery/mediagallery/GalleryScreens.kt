@@ -16,6 +16,9 @@
 
 package com.google.ai.edge.gallery.mediagallery
 
+import com.google.ai.edge.gallery.ui.theme.MsBgPageDeep
+import com.google.ai.edge.gallery.ui.theme.MsTextPrimary
+import com.google.ai.edge.gallery.ui.theme.MsFavorite
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -392,14 +395,14 @@ fun MediaCell(
       modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),
     )
     if (item.favorite && selected == null) {
-      Icon(Icons.Filled.Favorite, null, tint = Color.White, modifier = Modifier.align(Alignment.BottomStart).padding(4.dp).size(14.dp))
+      Icon(Icons.Filled.Favorite, null, tint = MsFavorite, modifier = Modifier.align(Alignment.BottomStart).padding(4.dp).size(14.dp))
     }
     if (selected != null) {
-      Box(Modifier.fillMaxSize().background(if (selected) Color.Black.copy(alpha = 0.35f) else Color.Transparent))
+      Box(Modifier.fillMaxSize().background(if (selected) MsBgPageDeep.copy(alpha = 0.35f) else Color.Transparent))
       Icon(
         if (selected) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
         contentDescription = if (selected) "Ausgewählt" else null,
-        tint = if (selected) MaterialTheme.colorScheme.primary else Color.White,
+        tint = if (selected) MaterialTheme.colorScheme.primary else MsTextPrimary,
         modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).size(22.dp),
       )
     }
@@ -408,14 +411,14 @@ fun MediaCell(
         modifier =
           Modifier.align(Alignment.BottomEnd)
             .padding(4.dp)
-            .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(6.dp))
+            .background(MsBgPageDeep.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
             .padding(horizontal = 4.dp, vertical = 1.dp),
         verticalAlignment = Alignment.CenterVertically,
       ) {
-        Icon(Icons.Filled.PlayArrow, null, tint = Color.White, modifier = Modifier.size(14.dp))
+        Icon(Icons.Filled.PlayArrow, null, tint = MsTextPrimary, modifier = Modifier.size(14.dp))
         Text(
           sceneSec?.let { "bei " + formatDuration((it * 1000).toLong()) } ?: formatDuration(item.durationMs),
-          color = Color.White,
+          color = MsTextPrimary,
           style = MaterialTheme.typography.labelSmall,
         )
       }

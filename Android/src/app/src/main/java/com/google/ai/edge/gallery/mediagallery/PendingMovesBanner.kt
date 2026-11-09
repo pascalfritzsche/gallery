@@ -17,6 +17,7 @@
 package com.google.ai.edge.gallery.mediagallery
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -33,7 +34,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun PendingMovesBanner(count: Int, onSortIn: () -> Unit) {
   Row(
-    Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(16.dp)).padding(12.dp),
+    Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer, MaterialTheme.shapes.large).border(1.dp, MaterialTheme.colorScheme.outline, MaterialTheme.shapes.large).padding(12.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
     Text(

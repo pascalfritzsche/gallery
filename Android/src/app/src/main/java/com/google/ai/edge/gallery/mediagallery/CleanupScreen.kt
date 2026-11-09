@@ -16,6 +16,8 @@
 
 package com.google.ai.edge.gallery.mediagallery
 
+import com.google.ai.edge.gallery.ui.theme.MsBgPageDeep
+import com.google.ai.edge.gallery.ui.theme.MsTextPrimary
 import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
@@ -227,9 +229,9 @@ fun CleanupScreen(viewModel: AnalysisViewModel, onBack: () -> Unit) {
             Icon(
               if (isSelected) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
               contentDescription = if (isSelected) "Zum Löschen ausgewählt" else "Bleibt",
-              tint = if (isSelected) MaterialTheme.colorScheme.primary else Color.White,
+              tint = if (isSelected) MaterialTheme.colorScheme.primary else MsTextPrimary,
               modifier =
-                Modifier.align(Alignment.TopEnd).padding(4.dp).size(24.dp).background(Color.Black.copy(alpha = 0.3f), MaterialTheme.shapes.extraLarge),
+                Modifier.align(Alignment.TopEnd).padding(4.dp).size(24.dp).background(MsBgPageDeep.copy(alpha = 0.3f), MaterialTheme.shapes.extraLarge),
             )
           }
         }

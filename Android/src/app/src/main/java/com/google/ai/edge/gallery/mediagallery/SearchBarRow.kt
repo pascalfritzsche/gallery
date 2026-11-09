@@ -72,7 +72,7 @@ fun SearchBarRow(
           }
         },
         singleLine = true,
-        shape = RoundedCornerShape(28.dp),
+        shape = RoundedCornerShape(16.dp),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
         keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
         modifier = Modifier.weight(1f).let { m -> focusRequester?.let { m.focusRequester(it) } ?: m },
