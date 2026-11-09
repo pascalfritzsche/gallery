@@ -110,7 +110,8 @@ constructor(
                   modelPath = m.getPath(context),
                   accelerator = Accelerator.GPU,
                   context = context,
-                  maxInputSequenceLength = 256,
+                  // a video sends two frames of PHONE_VISION_TOKENS each, plus a few special tokens
+                  maxInputSequenceLength = 512,
                   visionTokenBudget = PHONE_VISION_TOKENS,
                 )
                 .also { it.initialize() }
