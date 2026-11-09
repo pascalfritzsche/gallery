@@ -65,8 +65,8 @@ class AlbumRepository @Inject constructor(@ApplicationContext context: Context, 
   }
 
   /** Returns an error text or null. */
-  suspend fun create(bubbleKey: String, name: String, folder: Boolean): Pair<Album?, String?> =
-    when (val r = api.createAlbum(bubbleKey, name, folder)) {
+  suspend fun create(bubbleKey: String, core: com.google.ai.edge.gallery.mediagallery.bubbles.AlbumCore, name: String, folder: Boolean): Pair<Album?, String?> =
+    when (val r = api.createAlbum(bubbleKey, core, name, folder)) {
       is ApiResult.Ok -> {
         refresh()
         r.value to null

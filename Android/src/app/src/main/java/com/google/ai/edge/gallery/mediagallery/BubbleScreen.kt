@@ -65,6 +65,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material.icons.filled.ZoomOutMap
 import androidx.compose.material3.AlertDialog
@@ -158,7 +159,8 @@ private class Camera(x: Float, y: Float, z: Float, yaw: Float, pitch: Float, val
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BubbleScreen(viewModel: BubbleViewModel, onBack: () -> Unit, onOpen: (List<MediaItem>, Int) -> Unit) {
-  LaunchedEffect(Unit) { if (viewModel.state !is Loadable.Done) viewModel.load() }
+  // every visit: the stored bubbles show at once, new photos are added in the background
+  LaunchedEffect(Unit) { viewModel.load() }
   val parent = viewModel.parent()
   // back: first the selection, then one level up, then out
   BackHandler { if (!viewModel.back()) onBack() }
@@ -187,6 +189,13 @@ fun BubbleScreen(viewModel: BubbleViewModel, onBack: () -> Unit, onOpen: (List<M
       TopAppBar(
         title = { Text(parent?.title ?: "Bubbles", maxLines = 1, overflow = TextOverflow.Ellipsis) },
         navigationIcon = { IconButton(onClick = { if (!viewModel.back()) onBack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück") } },
+        actions = {
+          if (viewModel.updating && viewModel.state is Loadable.Done) {
+            CircularProgressIndicator(Modifier.padding(end = 16.dp).size(20.dp), strokeWidth = 2.dp)
+          } else if (viewModel.state is Loadable.Done) {
+            IconButton(onClick = { viewModel.load(regroup = true) }) { Icon(Icons.Filled.Refresh, "Neu gruppieren") }
+          }
+        },
       )
     }
   ) { padding ->
@@ -195,7 +204,7 @@ fun BubbleScreen(viewModel: BubbleViewModel, onBack: () -> Unit, onOpen: (List<M
         is Loadable.Done -> {
           val level = viewModel.level()
           if (level.isEmpty()) {
-            Text("Noch zu wenige Medien am Server für Bubbles.", modifier = Modifier.padding(24.dp))
+            Text("Noch zu wenige indexierte Medien für Bubbles.", modifier = Modifier.padding(24.dp))
           } else {
             BubbleSpace(viewModel, level, onOpen, onRename = { renaming = it }, onAlbum = { albumFor = it })
           }
@@ -284,18 +293,34 @@ private fun BubbleSpace(
   val scope = rememberCoroutineScope()
   var flight by remember { mutableStateOf<Job?>(null) }
 
-  // joystick: x = sideways, y = forward/back, both -1..1; moves at a fifth of the cloud per second
+  // joystick: x = sideways, y = forward/back, both -1..1. Full speed outside the cloud, slower
+  // among the stars: speed follows the distance to the nearest ones, so a dense spot is crossed slowly
   var stick by remember { mutableStateOf(Offset.Zero) }
+  val stars = remember(level) { levelMembers.flatten() }
   LaunchedEffect(stick != Offset.Zero) {
     if (stick == Offset.Zero) return@LaunchedEffect
     flight?.cancel()
     var last = 0L
+    var speed = Float.NaN
+    val near = FloatArray(5)
     while (true) {
       withFrameNanos { now ->
         if (last != 0L) {
           val dt = (now - last) / 1e9f
           val c = Camera(viewModel.camX, viewModel.camY, viewModel.camZ, viewModel.yaw, viewModel.pitch, 1f, 0f, 0f)
-          val v = extent * 0.45f * dt
+          near.fill(Float.MAX_VALUE)
+          for (m in stars) {
+            val d = hypot(hypot(m.x - viewModel.camX, m.y - viewModel.camY), m.z - viewModel.camZ)
+            if (d < near[4]) {
+              var i = 4
+              while (i > 0 && near[i - 1] > d) { near[i] = near[i - 1]; i-- }
+              near[i] = d
+            }
+          }
+          val gap = near.filter { it < Float.MAX_VALUE }.average().toFloat().takeIf { !it.isNaN() } ?: extent
+          val target = (gap * 1.2f).coerceIn(extent * 0.03f, extent * 0.45f)
+          speed = if (speed.isNaN()) target else speed + (target - speed) * minOf(1f, dt * 3f)
+          val v = speed * dt
           val fwd = -stick.y * v
           val side = stick.x * v
           viewModel.moveTo(viewModel.camX + c.fx * fwd + c.rx * side, viewModel.camY + c.fy * fwd, viewModel.camZ + c.fz * fwd + c.rz * side)
